@@ -1,20 +1,35 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
-// Custom APIs for renderer
-const api = {}
+// ✅ Custom API: window controls + time tracking
+const customAPI = {
+  sendFrameAction: (action) => {
+    ipcRenderer.send('frame-action', action)
+  },
 
-// Use `contextBridge` APIs to expose Electron APIs to
-// renderer only if context isolation is enabled, otherwise
-// just add to the DOM global.
+  // ⏱ Start tracking time
+  startIdleTracking: () => ipcRenderer.invoke('start-idle-tracking'),
+
+  // ⏹ Stop tracking time
+  stopIdleTracking: () => ipcRenderer.invoke('stop-idle-tracking'),
+
+  // 📊 Get tracked idle and working times
+  getIdleAndWorkTime: () => ipcRenderer.invoke('get-idle-and-work-time')
+}
+
+// ✅ Expose the APIs to renderer
 if (process.contextIsolated) {
   try {
-    contextBridge.exposeInMainWorld('electron', electronAPI)
-    contextBridge.exposeInMainWorld('api', api)
+    contextBridge.exposeInMainWorld('electron', {
+      ...electronAPI,
+      ...customAPI
+    })
   } catch (error) {
-    console.error(error)
+    console.error('Context bridge error:', error)
   }
 } else {
-  window.electron = electronAPI
-  window.api = api
+  window.electron = {
+    ...electronAPI,
+    ...customAPI
+  }
 }

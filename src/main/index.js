@@ -1,14 +1,18 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, powerMonitor } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
+let idleInterval = null
+let idleTime = 0
+let workTime = 0
 function createWindow() {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
     show: false,
+    frame: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
@@ -17,10 +21,50 @@ function createWindow() {
     }
   })
 
+  mainWindow.setAlwaysOnTop(true, 'screen')
+
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
 
+  ipcMain.on('frame-action', (event, action) => {
+    const win = BrowserWindow.getFocusedWindow()
+    if (!win) return
+
+    switch (action) {
+      case 'MINIMIZE':
+        win.minimize()
+        break
+      case 'MAXIMIZE':
+        win.isMaximized() ? win.unmaximize() : win.maximize()
+        break
+      case 'CLOSE':
+        win.close()
+        break
+    }
+  })
+  ipcMain.handle('start-idle-tracking', () => {
+    idleTime = 0
+    workTime = 0
+    if (idleInterval) clearInterval(idleInterval)
+
+    idleInterval = setInterval(() => {
+      const systemIdle = powerMonitor.getSystemIdleTime()
+      if (systemIdle >= 60) {
+        idleTime += 1000 // 1 second
+      } else {
+        workTime += 1000
+      }
+    }, 1000)
+  })
+
+  ipcMain.handle('stop-idle-tracking', () => {
+    clearInterval(idleInterval)
+  })
+
+  ipcMain.handle('get-idle-and-work-time', () => {
+    return { idle: idleTime, work: workTime }
+  })
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
