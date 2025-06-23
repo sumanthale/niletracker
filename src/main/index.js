@@ -9,7 +9,7 @@ let workTime = 0
 function createWindow() {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 900,
+    width: 460,
     height: 670,
     show: false,
     frame: false,
@@ -21,7 +21,7 @@ function createWindow() {
     }
   })
 
-  mainWindow.setAlwaysOnTop(true, 'screen')
+  // mainWindow.setAlwaysOnTop(true, 'screen')
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()

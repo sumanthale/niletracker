@@ -1,5 +1,5 @@
 // ClockPanel.jsx
-import { useState  } from 'react'
+import { useState } from 'react'
 
 export default function ClockPanel() {
   const [isTracking, setIsTracking] = useState(false)
@@ -23,7 +23,7 @@ export default function ClockPanel() {
       setWorkingTime(work)
     })
   }
-console.log(workingTime, idleTime);
+  console.log(workingTime, idleTime, clockInTime)
 
   return (
     <div className="p-4 rounded-xl shadow-lg bg-white space-y-4">
