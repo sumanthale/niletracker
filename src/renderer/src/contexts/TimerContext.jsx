@@ -3,6 +3,15 @@ import { useAuth } from './AuthContext'
 import { FirebaseService } from '../services/firebaseService'
 import { calculateProductiveHours, generateDummyScreenshots } from '../utils/timeUtils'
 import PropTypes from 'prop-types'
+const INITIAL_TIMER_STATE = {
+  isWorking: false,
+  currentSession: null,
+  startTime: null,
+  elapsedSeconds: 0,
+  idleEvents: [],
+  screenshots: [],
+  totalIdleMinutes: 0
+}
 
 const TimerContext = createContext(undefined)
 
@@ -23,6 +32,7 @@ export const TimerProvider = ({ children }) => {
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
   const currentIdleStartRef = useRef(null)
+  const tickIntervalRef = useRef(null)
 
   const [timerState, setTimerState] = useState({
     isWorking: false,
@@ -33,6 +43,7 @@ export const TimerProvider = ({ children }) => {
     screenshots: [],
     totalIdleMinutes: 0
   })
+
   const [showSubmissionForm, setShowSubmissionForm] = useState(false)
 
   // Load persisted state on mount
@@ -99,10 +110,8 @@ export const TimerProvider = ({ children }) => {
 
   // Timer tick effect
   useEffect(() => {
-    let interval
-
     if (timerState.isWorking) {
-      interval = setInterval(() => {
+      tickIntervalRef.current = setInterval(() => {
         setTimerState((prev) => ({
           ...prev,
           elapsedSeconds: prev.elapsedSeconds + 1
@@ -111,7 +120,7 @@ export const TimerProvider = ({ children }) => {
     }
 
     return () => {
-      if (interval) clearInterval(interval)
+      if (tickIntervalRef.current) clearInterval(tickIntervalRef.current)
     }
   }, [timerState.isWorking])
 
@@ -120,9 +129,13 @@ export const TimerProvider = ({ children }) => {
 
     const handleIdleStart = (startTime) => {
       currentIdleStartRef.current = new Date(startTime)
+      if (currentIdleStartRef.current) {
+        console.log('Idle started at:', currentIdleStartRef.current)
+      }
     }
 
     const handleIdleEnd = (endTime) => {
+      console.log('Idle ended at:', endTime)
       if (!currentIdleStartRef.current) return
 
       const end = new Date(endTime)
@@ -153,7 +166,6 @@ export const TimerProvider = ({ children }) => {
       // Clean up listeners on stop/cancel
       window.electron.offIdleStart?.()
       window.electron.offIdleEnd?.()
-      window.electron.stopIdleTracking?.()
     }
   }, [timerState.isWorking])
 
@@ -172,83 +184,76 @@ export const TimerProvider = ({ children }) => {
     return () => clearInterval(screenshotInterval)
   }, [timerState.isWorking])
 
-  const startWork = useCallback(() => {
+  const startWork = useCallback(async () => {
     if (!currentUser) return
 
-    const now = new Date()
-    const session = {
-      id: Date.now().toString(),
-      date: now.toISOString(),
-      clockIn: now.toISOString(),
-      totalMinutes: 0,
-      idleMinutes: 0,
-      productiveHours: 0,
-      screenshots: [],
-      status: 'active'
-    }
+    setTimerState((prev) => {
+      if (prev.isWorking) return prev
 
-    setTimerState({
-      isWorking: true,
-      currentSession: session,
-      startTime: Date.now(),
-      elapsedSeconds: 0,
-      idleEvents: [],
-      screenshots: [],
-      totalIdleMinutes: 0
+      const now = new Date()
+      const session = {
+        id: Date.now().toString(),
+        date: now.toISOString(),
+        clockIn: now.toISOString(),
+        totalMinutes: 0,
+        idleMinutes: 0,
+        productiveHours: 0,
+        screenshots: [],
+        status: 'active'
+      }
+
+      return {
+        isWorking: true,
+        currentSession: session,
+        startTime: Date.now(),
+        elapsedSeconds: 0,
+        idleEvents: [],
+        screenshots: [],
+        totalIdleMinutes: 0
+      }
     })
-
-    // 🔥 Start Electron idle tracking
-    window.electron.startIdleTracking()
+    await window.electron.startIdleTracking()
   }, [currentUser])
 
   const stopWork = useCallback(async () => {
-    if (!timerState.currentSession) return
-
     await window.electron.stopIdleTracking()
 
-    const totalMinutes = Math.floor(timerState.elapsedSeconds / 60)
-    const productiveHours = calculateProductiveHours(totalMinutes, timerState.totalIdleMinutes)
+    setTimerState((prev) => {
+      if (!prev.currentSession) return prev
 
-    const updatedSession = {
-      ...timerState.currentSession,
-      clockOut: new Date().toISOString(),
-      totalMinutes,
-      idleMinutes: timerState.totalIdleMinutes,
-      productiveHours,
-      screenshots: timerState.screenshots
-    }
+      const totalMinutes = Math.floor(prev.elapsedSeconds / 60)
+      const productiveHours = calculateProductiveHours(totalMinutes, prev.totalIdleMinutes)
 
-    setTimerState((prev) => ({
-      ...prev,
-      currentSession: updatedSession
-    }))
+      const updatedSession = {
+        ...prev.currentSession,
+        clockOut: new Date().toISOString(),
+        totalMinutes,
+        idleMinutes: prev.totalIdleMinutes,
+        productiveHours,
+        screenshots: prev.screenshots
+      }
 
-    setShowSubmissionForm(true)
-  }, [timerState])
+      setShowSubmissionForm(true)
+
+      return {
+        ...prev,
+        currentSession: updatedSession
+      }
+    })
+  }, [])
 
   const cancelWork = useCallback(async () => {
     if (!currentUser) return
 
     try {
-      // ⛔ Stop idle tracking
       await window.electron.stopIdleTracking()
     } catch (error) {
       console.error('Failed to stop idle tracking on cancel:', error)
     }
 
-    // 🧹 Clear persisted state
     localStorage.removeItem(`${STORAGE_KEY}_${currentUser.uid}`)
 
-    // 🔁 Reset state
-    setTimerState({
-      isWorking: false,
-      currentSession: null,
-      startTime: null,
-      elapsedSeconds: 0,
-      idleEvents: [],
-      screenshots: [],
-      totalIdleMinutes: 0
-    })
+    setTimerState(() => INITIAL_TIMER_STATE)
 
     setShowSubmissionForm(false)
   }, [currentUser])
@@ -294,15 +299,8 @@ export const TimerProvider = ({ children }) => {
   // Clear persisted state when user logs out
   useEffect(() => {
     if (!currentUser) {
-      setTimerState({
-        isWorking: false,
-        currentSession: null,
-        startTime: null,
-        elapsedSeconds: 0,
-        idleEvents: [],
-        screenshots: [],
-        totalIdleMinutes: 0
-      })
+      setTimerState(() => INITIAL_TIMER_STATE)
+
       setShowSubmissionForm(false)
     }
   }, [currentUser])

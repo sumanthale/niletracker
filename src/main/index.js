@@ -25,33 +25,39 @@ function createWindow() {
 
   // Window frame controls
   ipcMain.on('frame-action', (event, action) => {
-    const win = BrowserWindow.getFocusedWindow()
-    if (!win) return
+    if (!mainWindow) return
 
     switch (action) {
       case 'MINIMIZE':
-        win.minimize()
+        mainWindow.minimize()
         break
       case 'MAXIMIZE':
-        win.isMaximized() ? win.unmaximize() : win.maximize()
+        mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize()
         break
       case 'CLOSE':
-        win.close()
+        mainWindow.close()
         break
     }
   })
-
+  setInterval(() => {
+    console.log('Idle seconds:', powerMonitor.getSystemIdleTime())
+  }, 1000)
   ipcMain.handle('start-idle-tracking', () => {
     if (isTrackingIdle) return
+
     isTrackingIdle = true
+    console.log('Starting idle tracking...')
 
-    if (!mainWindow) return
+    powerMonitor.removeAllListeners('user-did-resign-active')
+    powerMonitor.removeAllListeners('user-did-become-active')
 
-    powerMonitor.on('user-idle', () => {
+    powerMonitor.on('user-did-resign-active', () => {
+      console.log('User is idle')
       mainWindow.webContents.send('idle-start', new Date().toISOString())
     })
 
-    powerMonitor.on('user-active', () => {
+    powerMonitor.on('user-did-become-active', () => {
+      console.log('User is active')
       mainWindow.webContents.send('idle-end', new Date().toISOString())
     })
   })
@@ -60,8 +66,10 @@ function createWindow() {
   ipcMain.handle('stop-idle-tracking', () => {
     if (!isTrackingIdle) return
     isTrackingIdle = false
-    powerMonitor.removeAllListeners('user-idle')
-    powerMonitor.removeAllListeners('user-active')
+    console.log('Stopping idle tracking...')
+
+    powerMonitor.removeAllListeners('user-did-resign-active')
+    powerMonitor.removeAllListeners('user-did-become-active')
   })
 
   // External links
@@ -98,8 +106,8 @@ app.whenReady().then(() => {
 // app.on('before-quit', () => {
 //   if (!isTrackingIdle) return
 //   isTrackingIdle = false
-//   powerMonitor.removeAllListeners('user-idle')
-//   powerMonitor.removeAllListeners('user-active')
+//   powerMonitor.removeAllListeners('user-did-resign-active')
+//   powerMonitor.removeAllListeners('user-did-become-active')
 // })
 // Quit when all windows are closed
 app.on('window-all-closed', () => {
