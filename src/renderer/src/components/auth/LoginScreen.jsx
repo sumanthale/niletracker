@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Eye, EyeOff, Mail, Lock,  ArrowRight, UserPlus, Sparkles } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import PropTypes from 'prop-types';
+import { handleFirebaseError } from '../../utils/timeUtils';
 
 
 
@@ -24,14 +25,17 @@ const LoginScreen = ({ onSwitchToRegister }) => {
     try {
       await login(email, password);
     } catch (error) {
-      setError(error.message || 'Failed to sign in');
+      const errorMessage = handleFirebaseError(error);
+      setError(errorMessage || 'Failed to sign in');
     } finally {
       setIsLoading(false);
     }
   };
 
+
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4 mt-[20px]">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4 mt-[40px]">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">

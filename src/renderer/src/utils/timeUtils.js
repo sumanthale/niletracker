@@ -46,3 +46,25 @@ export function formatDecimalHoursToHHMM(decimalHours) {
   const minutes = totalMinutes % 60;
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 }
+
+
+export const handleFirebaseError = (error) => {
+  let msg = error.message;
+  if (msg.includes("auth/email-already-in-use")) {
+    msg = "Email already in use";
+  } else if (msg.includes("auth/invalid-email")) {
+    msg = "Invalid email";
+  } else if (msg.includes("auth/weak-password")) {
+    msg = "Password should be at least 6 characters";
+  } else if (msg.includes("auth/user-not-found")) {
+    msg = "User not found";
+  } else if (msg.includes("auth/invalid-credential")) {
+    msg = "Invalid credentials";
+  } else if (msg.includes("auth/too-many-requests")) {
+    msg = "Too many requests, please try again later";
+  } else if (msg.includes("auth/network-request-failed")) {
+    msg = "Network request failed, please try again later";
+  }
+
+  return msg;
+};

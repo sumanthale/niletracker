@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import PropTypes from "prop-types";
+import { handleFirebaseError } from "../../utils/timeUtils";
 
 
 
@@ -50,14 +51,15 @@ const RegisterScreen = ({ onSwitchToLogin }) => {
     try {
       await register(email, password, fullName);
     } catch (error) {
-      setError(error.message || "Failed to create account");
+      const errorMessage = handleFirebaseError(error);
+      setError(errorMessage || 'Failed to create account');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50 flex items-center justify-center p-4 mt-[20px]">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50 flex items-center justify-center p-4 mt-[40px]">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
