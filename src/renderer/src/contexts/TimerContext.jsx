@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { useAuth } from './AuthContext'
 import { FirebaseService } from '../services/firebaseService'
-import { calculateProductiveHours, generateDummyScreenshots } from '../utils/timeUtils'
+import { calculateProductiveHours } from '../utils/timeUtils'
 import PropTypes from 'prop-types'
+import axios from 'axios'
 const INITIAL_TIMER_STATE = {
   isWorking: false,
   currentSession: null,
@@ -55,20 +56,15 @@ export const TimerProvider = ({ children }) => {
         const stored = localStorage.getItem(`${STORAGE_KEY}_${currentUser.uid}`)
         if (stored) {
           const parsedState = JSON.parse(stored)
-
+          console.log(parsedState)
           // Check if the stored session is from today
           const today = new Date().toDateString()
           const sessionDate = new Date(parsedState.currentSession?.date).toDateString()
 
           if (sessionDate === today && parsedState.isWorking) {
-            // Calculate elapsed time since last save
-            const now = Date.now()
-            const additionalSeconds = Math.floor((now - parsedState.lastSaved) / 1000)
-
-            setTimerState({
-              ...parsedState,
-              elapsedSeconds: parsedState.elapsedSeconds + additionalSeconds
-            })
+            setTimerState(parsedState)
+            startEvents()
+            console.log('Resuming timer from persisted state: and Events started')
           }
         }
       } catch (error) {
@@ -129,17 +125,17 @@ export const TimerProvider = ({ children }) => {
 
     const handleIdleStart = (startTime) => {
       currentIdleStartRef.current = new Date(startTime)
-      if (currentIdleStartRef.current) {
-        console.log('Idle started at:', currentIdleStartRef.current)
-      }
     }
 
     const handleIdleEnd = (endTime) => {
-      console.log('Idle ended at:', endTime)
       if (!currentIdleStartRef.current) return
 
       const end = new Date(endTime)
       const duration = Math.floor((end - currentIdleStartRef.current) / 60000)
+
+      console.log(
+        `Idle time ended: ${duration} minutes from ${currentIdleStartRef.current.toISOString()} to ${end.toISOString()}`
+      )
 
       if (duration > 0) {
         const event = {
@@ -170,19 +166,74 @@ export const TimerProvider = ({ children }) => {
   }, [timerState.isWorking])
 
   // Simulate screenshot capture
+  // useEffect(() => {
+  //   if (!timerState.isWorking) return
+  //   const interval = setInterval(
+  //     async () => {
+  //       try {
+  //         const screenshot = await window.electron?.getScreenshots()
+  //         console.log('Captured screenshot:', screenshot)
+  //         if (screenshot) {
+  //           setTimerState((prev) => ({
+  //             ...prev,
+  //             screenshots: [...prev.screenshots, screenshot]
+  //           }))
+  //         }
+  //       } catch (err) {
+  //         console.error('Screenshot capture failed:', err)
+  //       }
+  //     },
+  //     10 * 60 * 1000
+  //   ) // ⏱ Every 10 minutes
+
+  //   return () => clearInterval(interval)
+  // }, [timerState.isWorking])
+
   useEffect(() => {
     if (!timerState.isWorking) return
 
-    const screenshotInterval = setInterval(() => {
-      const newScreenshot = generateDummyScreenshots(1)[0]
+    const handleScreenshotTaken = async (screenshot) => {
+      if (!screenshot || !screenshot.image) return
+
+      const formData = new FormData()
+      formData.append('file', screenshot.image) // base64 data URI
+      formData.append('upload_preset', 'niletracker') // your unsigned upload preset
+      formData.append('cloud_name', 'dtrvrov97') // NOT required in formData actually
+
+      const response = await axios.post(
+        'https://api.cloudinary.com/v1_1/dtrvrov97/image/upload',
+        formData
+      )
+
+      const imageUrl = response.data.secure_url
+      console.log('✅ Uploaded Image URL:', imageUrl)
+
+      const newScreenshot = {
+        id: Date.now().toString(),
+        timestamp: screenshot.timestamp,
+        image: imageUrl
+      }
+
       setTimerState((prev) => ({
         ...prev,
-        screenshots: [...prev.screenshots, newScreenshot]
+        screenshots: [newScreenshot, ...prev.screenshots]
       }))
-    }, 600000) // Every 10 minutes
+    }
 
-    return () => clearInterval(screenshotInterval)
+    window.electron.screenshotTaken?.(handleScreenshotTaken)
+    return () => {
+      window.electron.offScreenshotTaken?.()
+    }
   }, [timerState.isWorking])
+
+  const startEvents = () => {
+    window.electron.startScreenShotCapture()
+    window.electron.startIdleTracking()
+  }
+  const stopEvents = () => {
+    window.electron.stopScreenShotCapture()
+    window.electron.stopIdleTracking()
+  }
 
   const startWork = useCallback(async () => {
     if (!currentUser) return
@@ -212,12 +263,10 @@ export const TimerProvider = ({ children }) => {
         totalIdleMinutes: 0
       }
     })
-    await window.electron.startIdleTracking()
+    startEvents()
   }, [currentUser])
 
   const stopWork = useCallback(async () => {
-    await window.electron.stopIdleTracking()
-
     setTimerState((prev) => {
       if (!prev.currentSession) return prev
 
@@ -246,7 +295,7 @@ export const TimerProvider = ({ children }) => {
     if (!currentUser) return
 
     try {
-      await window.electron.stopIdleTracking()
+      stopEvents()
     } catch (error) {
       console.error('Failed to stop idle tracking on cancel:', error)
     }
@@ -271,7 +320,7 @@ export const TimerProvider = ({ children }) => {
 
       try {
         await FirebaseService.saveSession(currentUser.uid, finalSession)
-
+        stopEvents()
         // Clear persisted state after successful submission
         localStorage.removeItem(`${STORAGE_KEY}_${currentUser.uid}`)
 

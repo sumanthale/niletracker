@@ -61,7 +61,7 @@ export const AuthProvider = ({
       fullName,
       createdAt: new Date().toISOString(),
       lastLogin: new Date().toISOString(),
-      role: "user", // Default role
+      role: "employee", // Default role
     };
 
     await setDoc(doc(db, "users", result.user.uid), userProfile);

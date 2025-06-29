@@ -5,6 +5,7 @@ import { TimerProvider, useTimer } from './contexts/TimerContext'
 import AuthWrapper from './components/auth/AuthWrapper'
 import Dashboard from './components/Dashboard'
 import PastSessions from './components/PastSessions'
+import { ScreenshotProvider } from './contexts/SreenShotContext'
 
 function AppContent() {
   const { currentUser, userProfile, logout } = useAuth()
@@ -162,8 +163,10 @@ function App() {
   return (
     <AuthProvider>
       <TimerProvider>
-        <Header />
-        <AppContent />
+        <ScreenshotProvider>
+          <Header />
+          <AppContent />
+        </ScreenshotProvider>
       </TimerProvider>
     </AuthProvider>
   )
@@ -173,7 +176,7 @@ export default App
 
 function Header() {
   return (
-    <header id='header'>
+    <header id="header">
       <button id="close" onClick={() => window.electron.sendFrameAction('CLOSE')} className="group">
         <img
           src="https://cdn-icons-png.flaticon.com/128/9068/9068699.png"

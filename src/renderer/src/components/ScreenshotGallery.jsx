@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import PropTypes from 'prop-types'
 import { Camera, Image, ZoomIn, X } from 'lucide-react'
+import dayjs from 'dayjs'
 
 const ScreenshotGallery = ({ screenshots }) => {
   const [selectedImage, setSelectedImage] = useState(null)
@@ -36,7 +37,7 @@ const ScreenshotGallery = ({ screenshots }) => {
                   onClick={() => setSelectedImage(screenshot)}
                 >
                   <img
-                    src={screenshot}
+                    src={screenshot?.image}
                     alt={`Screenshot ${index + 1}`}
                     className="w-full h-28 object-cover rounded-xl border-2 border-purple-100 group-hover:border-purple-300 transition-all duration-300"
                   />
@@ -47,12 +48,7 @@ const ScreenshotGallery = ({ screenshots }) => {
                     #{screenshots.length - index}
                   </div>
                   <div className="absolute top-2 left-2 bg-purple-500 text-white text-xs px-2 py-1 rounded-lg font-medium">
-                    {new Date(
-                      Date.now() - (screenshots.length - index - 1) * 600000
-                    ).toLocaleTimeString('en-US', {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
+                    {dayjs(screenshot.timestamp).format('MMM D, HH:mm')}
                   </div>
                 </div>
               ))}
@@ -90,7 +86,7 @@ const ScreenshotGallery = ({ screenshots }) => {
         >
           <div className="relative max-w-4xl max-h-full">
             <img
-              src={selectedImage}
+              src={selectedImage.image}
               alt="Screenshot preview"
               className="max-w-full max-h-full object-contain rounded-xl"
               onClick={(e) => e.stopPropagation()}

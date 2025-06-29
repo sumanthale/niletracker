@@ -12,7 +12,13 @@ const customAPI = {
   onIdleStart: (cb) => ipcRenderer.on('idle-start', (_, data) => cb(data)),
   onIdleEnd: (cb) => ipcRenderer.on('idle-end', (_, data) => cb(data)),
   offIdleStart: () => ipcRenderer.removeAllListeners('idle-start'),
-  offIdleEnd: () => ipcRenderer.removeAllListeners('idle-end')
+  offIdleEnd: () => ipcRenderer.removeAllListeners('idle-end'),
+
+  startScreenShotCapture: () => ipcRenderer.invoke('start-screenshot-capture'),
+  stopScreenShotCapture: () => ipcRenderer.invoke('stop-screenshot-capture'),
+
+  screenshotTaken: (cb) => ipcRenderer.on('screenshot-taken', (_, data) => cb(data)),
+  offScreenshotTaken: () => ipcRenderer.removeAllListeners('screenshot-taken'),
 }
 
 // ✅ Expose APIs to renderer

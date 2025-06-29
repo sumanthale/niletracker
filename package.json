@@ -20,6 +20,7 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.1",
     "@electron-toolkit/utils": "^4.0.0",
+    "axios": "^1.10.0",
     "dayjs": "^1.11.13",
     "firebase": "^11.9.1",
     "lucide-react": "^0.522.0"

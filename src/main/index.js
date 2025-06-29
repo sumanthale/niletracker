@@ -1,12 +1,22 @@
-import { app, shell, BrowserWindow, ipcMain, powerMonitor } from 'electron'
-import { join } from 'path'
+import {
+  app,
+  shell,
+  BrowserWindow,
+  ipcMain,
+  powerMonitor,
+  desktopCapturer,
+  screen,
+  Tray,
+  Menu
+} from 'electron'
+import path, { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-
-let isTrackingIdle = false
+let screenshotInterval = null
+let mainWindow = null
 
 function createWindow() {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 460,
     height: 670,
     show: false,
@@ -15,7 +25,8 @@ function createWindow() {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: false,
+       backgroundThrottling: false // 🛑 disables Chromium throttling
     }
   })
 
@@ -35,43 +46,90 @@ function createWindow() {
         mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize()
         break
       case 'CLOSE':
-        mainWindow.close()
+        mainWindow.hide()
         break
     }
   })
-  setInterval(() => {
-    console.log('Idle seconds:', powerMonitor.getSystemIdleTime())
-  }, 1000)
+  let isTrackingIdle = false
+  let idlePollingInterval = null
+  let wasIdle = false
+
   ipcMain.handle('start-idle-tracking', () => {
+    console.log('🟡 start-idle-tracking invoked')
     if (isTrackingIdle) return
-
     isTrackingIdle = true
-    console.log('Starting idle tracking...')
 
-    powerMonitor.removeAllListeners('user-did-resign-active')
-    powerMonitor.removeAllListeners('user-did-become-active')
+    const idleThreshold = 60 // seconds
 
-    powerMonitor.on('user-did-resign-active', () => {
-      console.log('User is idle')
-      mainWindow.webContents.send('idle-start', new Date().toISOString())
-    })
+    idlePollingInterval = setInterval(() => {
+      const idleSeconds = powerMonitor.getSystemIdleTime()
 
-    powerMonitor.on('user-did-become-active', () => {
-      console.log('User is active')
-      mainWindow.webContents.send('idle-end', new Date().toISOString())
-    })
+      if (idleSeconds >= idleThreshold && !wasIdle) {
+        wasIdle = true
+        console.log('⛔ User is idle')
+        mainWindow.webContents.send('idle-start', new Date().toISOString())
+      } else if (idleSeconds < idleThreshold && wasIdle) {
+        wasIdle = false
+        console.log('🟢 User is active again')
+        mainWindow.webContents.send('idle-end', new Date().toISOString())
+      }
+    }, 5000) // poll every 5s
   })
 
-  // 🟢 Stop idle session tracking
   ipcMain.handle('stop-idle-tracking', () => {
+    console.log('⛔ stop-idle-tracking invoked')
     if (!isTrackingIdle) return
     isTrackingIdle = false
-    console.log('Stopping idle tracking...')
+    clearInterval(idlePollingInterval)
+    idlePollingInterval = null
+    wasIdle = false
+  })
+  const primaryDisplay = screen.getPrimaryDisplay()
+  const { width, height } = primaryDisplay.size
+  ipcMain.handle('start-screenshot-capture', async () => {
+    console.log('📸 Screenshot capture started')
 
-    powerMonitor.removeAllListeners('user-did-resign-active')
-    powerMonitor.removeAllListeners('user-did-become-active')
+    if (screenshotInterval) return
+
+    screenshotInterval = setInterval(
+      async () => {
+        const sources = await desktopCapturer.getSources({
+          types: ['screen'],
+          thumbnailSize: {
+            width: width, //reduce to 50% Capture half the width
+            height: height // Capture half the height
+          }
+        })
+        const screenSource = sources.find(
+          (src) => src.name === 'Entire Screen' || src.name === 'Screen 1'
+        )
+
+        if (!screenSource) {
+          console.warn('No screen source found')
+          return
+        }
+        const jpegBuffer = screenSource.thumbnail.toJPEG(50) // 50 = compression quality (0–100)
+        const base64 = `data:image/jpeg;base64,${jpegBuffer.toString('base64')}`
+        mainWindow.webContents.send('screenshot-taken', {
+          timestamp: new Date().toISOString(),
+          image: base64
+        })
+      },
+      10 * 60 * 1000
+    ) // every 60 seconds
   })
 
+  ipcMain.handle('stop-screenshot-capture', () => {
+    console.log('⛔ Screenshot capture stopped')
+    if (screenshotInterval) {
+      clearInterval(screenshotInterval)
+      screenshotInterval = null
+    }
+  })
+  mainWindow.on('close', (e) => {
+    e.preventDefault()
+    mainWindow.hide() // Hide instead of closing
+  })
   // External links
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
@@ -85,6 +143,7 @@ function createWindow() {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
+let tray = null
 
 // App ready
 app.whenReady().then(() => {
@@ -101,17 +160,26 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+  tray = new Tray(path.join(__dirname, '../../resources/icon.png'))
+  const contextMenu = Menu.buildFromTemplate([
+    { label: 'Show App', click: () => mainWindow.show() },
+    {
+      label: 'Quit',
+      click: () => {
+        app.isQuiting = true
+        app.quit()
+      }
+    }
+  ])
+  tray.setToolTip('Time Tracker')
+  tray.setContextMenu(contextMenu)
 })
-// Stop idle tracking when app is closed
-// app.on('before-quit', () => {
-//   if (!isTrackingIdle) return
-//   isTrackingIdle = false
-//   powerMonitor.removeAllListeners('user-did-resign-active')
-//   powerMonitor.removeAllListeners('user-did-become-active')
-// })
-// Quit when all windows are closed
+
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
+  // if (process.platform !== 'darwin') {
+  //   app.quit()
+  // }
+  if (process.platform === 'darwin') {
+    app.dock.hide()
   }
 })
