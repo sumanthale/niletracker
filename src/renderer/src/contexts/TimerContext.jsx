@@ -4,6 +4,8 @@ import { FirebaseService } from '../services/firebaseService'
 import { calculateProductiveHours } from '../utils/timeUtils'
 import PropTypes from 'prop-types'
 import axios from 'axios'
+
+const STORAGE_KEY = 'timetracker_active_session'
 const INITIAL_TIMER_STATE = {
   isWorking: false,
   currentSession: null,
@@ -16,264 +18,184 @@ const INITIAL_TIMER_STATE = {
 
 const TimerContext = createContext(undefined)
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const useTimer = () => {
   const context = useContext(TimerContext)
-  if (!context) {
-    throw new Error('useTimer must be used within a TimerProvider')
-  }
+  if (!context) throw new Error('useTimer must be used within a TimerProvider')
   return context
 }
-
-const STORAGE_KEY = 'timetracker_active_session'
 
 export const TimerProvider = ({ children }) => {
   const { currentUser } = useAuth()
 
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
-  const currentIdleStartRef = useRef(null)
-  const tickIntervalRef = useRef(null)
-
-  const [timerState, setTimerState] = useState({
-    isWorking: false,
-    currentSession: null,
-    startTime: null,
-    elapsedSeconds: 0,
-    idleEvents: [],
-    screenshots: [],
-    totalIdleMinutes: 0
-  })
-
+  const [timerState, setTimerState] = useState(INITIAL_TIMER_STATE)
   const [showSubmissionForm, setShowSubmissionForm] = useState(false)
 
-  // Load persisted state on mount
+  const tickIntervalRef = useRef(null)
+  const currentIdleStartRef = useRef(null)
+
+  const persistState = useCallback(() => {
+    if (!currentUser || !timerState.isWorking) return
+    localStorage.setItem(
+      `${STORAGE_KEY}_${currentUser.uid}`,
+      JSON.stringify({ ...timerState, lastSaved: Date.now() })
+    )
+  }, [timerState, currentUser])
+
   useEffect(() => {
     if (!currentUser) return
 
-    const loadPersistedState = () => {
+    const stored = localStorage.getItem(`${STORAGE_KEY}_${currentUser.uid}`)
+    if (stored) {
       try {
-        const stored = localStorage.getItem(`${STORAGE_KEY}_${currentUser.uid}`)
-        if (stored) {
-          const parsedState = JSON.parse(stored)
-          console.log(parsedState)
-          // Check if the stored session is from today
-          const today = new Date().toDateString()
-          const sessionDate = new Date(parsedState.currentSession?.date).toDateString()
-
-          if (sessionDate === today && parsedState.isWorking) {
-            setTimerState(parsedState)
-            startEvents()
-            console.log('Resuming timer from persisted state: and Events started')
-          }
+        const parsed = JSON.parse(stored)
+        const today = new Date().toDateString()
+        const storedDate = new Date(parsed.currentSession?.date).toDateString()
+        if (parsed.isWorking && storedDate === today) {
+          setTimerState(parsed)
+          startEvents()
         }
-      } catch (error) {
-        console.error('Error loading persisted timer state:', error)
+      } catch (err) {
+        console.error('Failed to load persisted timer state:', err)
       }
     }
-
-    loadPersistedState()
   }, [currentUser])
 
   useEffect(() => {
-    const loadSessions = async () => {
-      if (currentUser) {
-        try {
-          const userSessions = await FirebaseService.getUserSessions(currentUser.uid)
-          setSessions(userSessions)
-        } catch (error) {
-          console.error('Error loading sessions:', error)
-        } finally {
-          setLoading(false)
-        }
-      }
-    }
-
-    loadSessions()
+    if (!currentUser) return
+    FirebaseService.getUserSessions(currentUser.uid)
+      .then(setSessions)
+      .catch((err) => console.error('Failed to load sessions:', err))
+      .finally(() => setLoading(false))
   }, [currentUser])
 
-  // Persist state whenever it changes
-  useEffect(() => {
-    if (!currentUser || !timerState.isWorking) return
+  useEffect(() => persistState(), [persistState])
 
-    const stateToSave = {
-      ...timerState,
-      lastSaved: Date.now()
-    }
-
-    localStorage.setItem(`${STORAGE_KEY}_${currentUser.uid}`, JSON.stringify(stateToSave))
-  }, [timerState, currentUser])
-
-  // Timer tick effect
   useEffect(() => {
     if (timerState.isWorking) {
-      tickIntervalRef.current = setInterval(() => {
-        setTimerState((prev) => ({
-          ...prev,
-          elapsedSeconds: prev.elapsedSeconds + 1
-        }))
-      }, 1000)
+      tickIntervalRef.current = setInterval(
+        () => setTimerState((prev) => ({ ...prev, elapsedSeconds: prev.elapsedSeconds + 1 })),
+        1000
+      )
     }
-
-    return () => {
-      if (tickIntervalRef.current) clearInterval(tickIntervalRef.current)
-    }
+    return () => clearInterval(tickIntervalRef.current)
   }, [timerState.isWorking])
 
   useEffect(() => {
     if (!timerState.isWorking) return
 
-    const handleIdleStart = (startTime) => {
-      currentIdleStartRef.current = new Date(startTime)
-    }
+    const onIdleStart = (start) => (currentIdleStartRef.current = new Date(start))
 
-    const handleIdleEnd = (endTime) => {
+    const onIdleEnd = (end) => {
       if (!currentIdleStartRef.current) return
-
-      const end = new Date(endTime)
-      const duration = Math.floor((end - currentIdleStartRef.current) / 60000)
-
-      console.log(
-        `Idle time ended: ${duration} minutes from ${currentIdleStartRef.current.toISOString()} to ${end.toISOString()}`
-      )
-
+      const endTime = new Date(end)
+      const duration = Math.floor((endTime - currentIdleStartRef.current) / 60000)
       if (duration > 0) {
         const event = {
           id: Date.now().toString(),
           startTime: currentIdleStartRef.current.toISOString(),
-          endTime: end.toISOString(),
+          endTime: endTime.toISOString(),
           duration
         }
-
         setTimerState((prev) => ({
           ...prev,
           idleEvents: [...prev.idleEvents, event],
           totalIdleMinutes: prev.totalIdleMinutes + duration
         }))
       }
-
       currentIdleStartRef.current = null
     }
 
-    window.electron.onIdleStart?.(handleIdleStart)
-    window.electron.onIdleEnd?.(handleIdleEnd)
+    window.electron.onIdleStart?.(onIdleStart)
+    window.electron.onIdleEnd?.(onIdleEnd)
 
     return () => {
-      // Clean up listeners on stop/cancel
       window.electron.offIdleStart?.()
       window.electron.offIdleEnd?.()
     }
   }, [timerState.isWorking])
 
-  // Simulate screenshot capture
-  // useEffect(() => {
-  //   if (!timerState.isWorking) return
-  //   const interval = setInterval(
-  //     async () => {
-  //       try {
-  //         const screenshot = await window.electron?.getScreenshots()
-  //         console.log('Captured screenshot:', screenshot)
-  //         if (screenshot) {
-  //           setTimerState((prev) => ({
-  //             ...prev,
-  //             screenshots: [...prev.screenshots, screenshot]
-  //           }))
-  //         }
-  //       } catch (err) {
-  //         console.error('Screenshot capture failed:', err)
-  //       }
-  //     },
-  //     10 * 60 * 1000
-  //   ) // ⏱ Every 10 minutes
-
-  //   return () => clearInterval(interval)
-  // }, [timerState.isWorking])
-
   useEffect(() => {
     if (!timerState.isWorking) return
 
-    const handleScreenshotTaken = async (screenshot) => {
-      if (!screenshot || !screenshot.image) return
+    const onScreenshot = async (screenshot) => {
+      if (!screenshot?.image) return
+      try {
+        const formData = new FormData()
+        formData.append('file', screenshot.image)
+        formData.append('upload_preset', 'niletracker')
 
-      const formData = new FormData()
-      formData.append('file', screenshot.image) // base64 data URI
-      formData.append('upload_preset', 'niletracker') // your unsigned upload preset
-      formData.append('cloud_name', 'dtrvrov97') // NOT required in formData actually
+        const res = await axios.post(
+          'https://api.cloudinary.com/v1_1/dtrvrov97/image/upload',
+          formData
+        )
 
-      const response = await axios.post(
-        'https://api.cloudinary.com/v1_1/dtrvrov97/image/upload',
-        formData
-      )
+        const imageUrl = res.data.secure_url
+        const shot = {
+          id: Date.now().toString(),
+          timestamp: screenshot.timestamp,
+          image: imageUrl
+        }
 
-      const imageUrl = response.data.secure_url
-      console.log('✅ Uploaded Image URL:', imageUrl)
-
-      const newScreenshot = {
-        id: Date.now().toString(),
-        timestamp: screenshot.timestamp,
-        image: imageUrl
+        setTimerState((prev) => ({
+          ...prev,
+          screenshots: [shot, ...prev.screenshots]
+        }))
+      } catch (err) {
+        console.error('Failed to upload screenshot:', err)
       }
-
-      setTimerState((prev) => ({
-        ...prev,
-        screenshots: [newScreenshot, ...prev.screenshots]
-      }))
     }
 
-    window.electron.screenshotTaken?.(handleScreenshotTaken)
-    return () => {
-      window.electron.offScreenshotTaken?.()
-    }
+    window.electron.screenshotTaken?.(onScreenshot)
+    return () => window.electron.offScreenshotTaken?.()
   }, [timerState.isWorking])
 
   const startEvents = () => {
-    window.electron.startScreenShotCapture()
-    window.electron.startIdleTracking()
-  }
-  const stopEvents = () => {
-    window.electron.stopScreenShotCapture()
-    window.electron.stopIdleTracking()
+    window.electron.startScreenShotCapture?.()
+    window.electron.startIdleTracking?.()
   }
 
-  const startWork = useCallback(async () => {
+  const stopEvents = () => {
+    window.electron.stopScreenShotCapture?.()
+    window.electron.stopIdleTracking?.()
+  }
+
+  const startWork = useCallback(() => {
     if (!currentUser) return
 
-    setTimerState((prev) => {
-      if (prev.isWorking) return prev
+    const now = new Date()
+    const session = {
+      id: Date.now().toString(),
+      date: now.toISOString(),
+      clockIn: now.toISOString(),
+      totalMinutes: 0,
+      idleMinutes: 0,
+      productiveHours: 0,
+      screenshots: [],
+      status: 'active'
+    }
 
-      const now = new Date()
-      const session = {
-        id: Date.now().toString(),
-        date: now.toISOString(),
-        clockIn: now.toISOString(),
-        totalMinutes: 0,
-        idleMinutes: 0,
-        productiveHours: 0,
-        screenshots: [],
-        status: 'active'
-      }
-
-      return {
-        isWorking: true,
-        currentSession: session,
-        startTime: Date.now(),
-        elapsedSeconds: 0,
-        idleEvents: [],
-        screenshots: [],
-        totalIdleMinutes: 0
-      }
+    setTimerState({
+      isWorking: true,
+      currentSession: session,
+      startTime: Date.now(),
+      elapsedSeconds: 0,
+      idleEvents: [],
+      screenshots: [],
+      totalIdleMinutes: 0
     })
     startEvents()
   }, [currentUser])
 
-  const stopWork = useCallback(async () => {
+  const stopWork = useCallback(() => {
     setTimerState((prev) => {
       if (!prev.currentSession) return prev
 
       const totalMinutes = Math.floor(prev.elapsedSeconds / 60)
       const productiveHours = calculateProductiveHours(totalMinutes, prev.totalIdleMinutes)
 
-      const updatedSession = {
+      const updated = {
         ...prev.currentSession,
         clockOut: new Date().toISOString(),
         totalMinutes,
@@ -283,27 +205,15 @@ export const TimerProvider = ({ children }) => {
       }
 
       setShowSubmissionForm(true)
-
-      return {
-        ...prev,
-        currentSession: updatedSession
-      }
+      return { ...prev, currentSession: updated }
     })
   }, [])
 
-  const cancelWork = useCallback(async () => {
+  const cancelWork = useCallback(() => {
     if (!currentUser) return
-
-    try {
-      stopEvents()
-    } catch (error) {
-      console.error('Failed to stop idle tracking on cancel:', error)
-    }
-
+    stopEvents()
     localStorage.removeItem(`${STORAGE_KEY}_${currentUser.uid}`)
-
-    setTimerState(() => INITIAL_TIMER_STATE)
-
+    setTimerState(INITIAL_TIMER_STATE)
     setShowSubmissionForm(false)
   }, [currentUser])
 
@@ -311,7 +221,7 @@ export const TimerProvider = ({ children }) => {
     async (comment) => {
       if (!timerState.currentSession || !currentUser) return
 
-      const finalSession = {
+      const final = {
         ...timerState.currentSession,
         status: 'submitted',
         approvalStatus: 'pending',
@@ -319,37 +229,24 @@ export const TimerProvider = ({ children }) => {
       }
 
       try {
-        await FirebaseService.saveSession(currentUser.uid, finalSession)
+        await FirebaseService.saveSession(currentUser.uid, final)
         stopEvents()
-        // Clear persisted state after successful submission
         localStorage.removeItem(`${STORAGE_KEY}_${currentUser.uid}`)
 
-        // Reset timer state
-        setTimerState({
-          isWorking: false,
-          currentSession: null,
-          startTime: null,
-          elapsedSeconds: 0,
-          idleEvents: [],
-          screenshots: [],
-          totalIdleMinutes: 0
-        })
-
-        setSessions((prev) => [finalSession, ...prev])
+        setTimerState(INITIAL_TIMER_STATE)
+        setSessions((prev) => [final, ...prev])
         setShowSubmissionForm(false)
-      } catch (error) {
-        console.error('Error submitting session:', error)
-        throw error
+      } catch (err) {
+        console.error('Failed to submit session:', err)
+        throw err
       }
     },
     [timerState.currentSession, currentUser]
   )
 
-  // Clear persisted state when user logs out
   useEffect(() => {
     if (!currentUser) {
-      setTimerState(() => INITIAL_TIMER_STATE)
-
+      setTimerState(INITIAL_TIMER_STATE)
       setShowSubmissionForm(false)
     }
   }, [currentUser])

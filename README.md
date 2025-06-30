@@ -1,6 +1,6 @@
 # timely
 
-An Electron application with React
+Track your producivity
 
 ## Recommended IDE Setup
 

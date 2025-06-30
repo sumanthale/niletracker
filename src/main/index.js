@@ -14,6 +14,8 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 let screenshotInterval = null
 let mainWindow = null
+let systemSleepStartedAt = null
+let lockStartedAt = null
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -26,7 +28,7 @@ function createWindow() {
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
-       backgroundThrottling: false // 🛑 disables Chromium throttling
+      backgroundThrottling: false // 🛑 disables Chromium throttling
     }
   })
 
@@ -74,6 +76,53 @@ function createWindow() {
         mainWindow.webContents.send('idle-end', new Date().toISOString())
       }
     }, 5000) // poll every 5s
+
+    // --- Sleep Detection ---
+    powerMonitor.on('suspend', () => {
+      systemSleepStartedAt = Date.now()
+      console.log('💤 System is suspending')
+
+      if (!wasIdle) {
+        wasIdle = true
+        mainWindow.webContents.send('idle-start', new Date(systemSleepStartedAt).toISOString())
+      }
+    })
+
+    powerMonitor.on('resume', () => {
+      const resumeTime = Date.now()
+      console.log('🔋 System has resumed')
+
+      if (systemSleepStartedAt) {
+        const sleepDurationSeconds = Math.floor((resumeTime - systemSleepStartedAt) / 1000)
+
+        if (sleepDurationSeconds >= idleThreshold) {
+          console.log(`🕒 System was asleep for ${sleepDurationSeconds} seconds`)
+          mainWindow.webContents.send('idle-end', new Date(resumeTime).toISOString())
+          wasIdle = false
+        }
+
+        systemSleepStartedAt = null
+      }
+    })
+
+    // --- Lock Detection ---
+    powerMonitor.on('lock-screen', () => {
+      console.log('🔒 Screen locked')
+      if (!wasIdle) {
+        wasIdle = true
+        lockStartedAt = Date.now()
+        mainWindow.webContents.send('idle-start', new Date(lockStartedAt).toISOString())
+      }
+    })
+
+    powerMonitor.on('unlock-screen', () => {
+      console.log('🔓 Screen unlocked')
+      if (wasIdle) {
+        mainWindow.webContents.send('idle-end', new Date().toISOString())
+        wasIdle = false
+        lockStartedAt = null
+      }
+    })
   })
 
   ipcMain.handle('stop-idle-tracking', () => {

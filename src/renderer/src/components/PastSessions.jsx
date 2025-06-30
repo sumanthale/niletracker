@@ -1,4 +1,4 @@
-import  { useState, useMemo } from "react";
+import { useState, useMemo } from 'react'
 import {
   Calendar,
   Clock,
@@ -7,8 +7,6 @@ import {
   AlertCircle,
   Filter,
   Search,
-  Eye,
-  Camera,
   ChevronDown,
   ChevronUp,
   SortAsc,
@@ -17,164 +15,113 @@ import {
   User,
   FileText,
   TrendingUp,
-  X,
-} from "lucide-react";
-import { formatDate, formatTime } from "../utils/timeUtils";
-import dayjs from "dayjs";
-import PropTypes from "prop-types";
-
+  X
+} from 'lucide-react'
+import { formatDate, formatTime } from '../utils/timeUtils'
+import dayjs from 'dayjs'
+import PropTypes from 'prop-types'
 
 const PastSessions = ({ sessions }) => {
   const [filters, setFilters] = useState({
-    status: "all",
-    dateRange: "all",
-    hoursRange: "all",
-  });
-  const [searchTerm, setSearchTerm] = useState("");
-  const [expandedSession, setExpandedSession] = useState(null);
-  const [sortField, setSortField] = useState("date");
-  const [sortOrder, setSortOrder] = useState("desc");
-  const [showFilters, setShowFilters] = useState(false);
+    status: 'all',
+    dateRange: 'all',
+    hoursRange: 'all'
+  })
+  const [searchTerm, setSearchTerm] = useState('')
+  const [expandedSession, setExpandedSession] = useState(null)
+  const [sortField, setSortField] = useState('date')
+  const [sortOrder, setSortOrder] = useState('desc')
+  const [showFilters, setShowFilters] = useState(false)
+  const [selectedImage, setSelectedImage] = useState(null)
 
-  // Enhanced sessions with dummy approval data
-  const enhancedSessions = useMemo(() => {
-    return sessions.map((session) => ({
-      ...session,
-      approvalStatus:
-        session.approvalStatus ||
-        (["pending", "approved", "rejected"][Math.floor(Math.random() * 3)]),
-      approvedBy:
-        session.approvedBy ||
-        (Math.random() > 0.5 ? "Sarah Johnson" : "Mike Chen"),
-      approvedAt:
-        session.approvedAt ||
-        new Date(
-          Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000
-        ).toISOString(),
-      approvalComment:
-        session.approvalComment ||
-        (Math.random() > 0.7 ? "Good work today!" : undefined),
-    }));
-  }, [sessions]);
-
-  // Filtered and sorted sessions
   const filteredAndSortedSessions = useMemo(() => {
-    const filtered = enhancedSessions.filter((session) => {
-      // Status filter
-      if (
-        filters.status !== "all" &&
-        session.approvalStatus !== filters.status
-      ) {
-        return false;
+    const filtered = sessions.filter((session) => {
+      if (filters.status !== 'all' && session.approvalStatus !== filters.status) return false
+
+      if (filters.hoursRange === 'full' && session.productiveHours < 8) return false
+      if (filters.hoursRange === 'partial' && session.productiveHours >= 8) return false
+
+      const sessionDate = new Date(session.date)
+      const now = new Date()
+      if (filters.dateRange === 'week') {
+        const weekAgo = new Date(now.getTime() - 7 * 86400000)
+        if (sessionDate < weekAgo) return false
+      } else if (filters.dateRange === 'month') {
+        const monthAgo = new Date(now.getTime() - 30 * 86400000)
+        if (sessionDate < monthAgo) return false
       }
 
-      // Hours filter
-      if (filters.hoursRange === "full" && session.productiveHours < 8) {
-        return false;
-      }
-      if (filters.hoursRange === "partial" && session.productiveHours >= 8) {
-        return false;
-      }
-
-      // Date range filter
-      const sessionDate = new Date(session.date);
-      const now = new Date();
-      if (filters.dateRange === "week") {
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        if (sessionDate < weekAgo) return false;
-      } else if (filters.dateRange === "month") {
-        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        if (sessionDate < monthAgo) return false;
-      }
-
-      // Search filter
       if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
+        const searchLower = searchTerm.toLowerCase()
         return (
           formatDate(sessionDate).toLowerCase().includes(searchLower) ||
           session.lessHoursComment?.toLowerCase().includes(searchLower) ||
-          session.approvalComment?.toLowerCase().includes(searchLower)
-        );
+          session.managerComment?.toLowerCase().includes(searchLower)
+        )
       }
 
-      return true;
-    });
+      return true
+    })
 
-    // Sort sessions
     filtered.sort((a, b) => {
-      let comparison = 0;
-
-      switch (sortField) {
-        case "date":
-          comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
-          break;
-        case "hours":
-          comparison = a.productiveHours - b.productiveHours;
-          break;
-        case "status": {
-          const statusOrder = { approved: 3, pending: 2, rejected: 1 };
-          comparison =
-            statusOrder[a.approvalStatus] - statusOrder[b.approvalStatus];
-          break;
-        }
+      let comparison = 0
+      if (sortField === 'date') {
+        comparison = new Date(a.date) - new Date(b.date)
+      } else if (sortField === 'hours') {
+        comparison = a.productiveHours - b.productiveHours
+      } else if (sortField === 'status') {
+        const statusOrder = { approved: 3, pending: 2, rejected: 1 }
+        comparison = statusOrder[a.approvalStatus] - statusOrder[b.approvalStatus]
       }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
 
-      return sortOrder === "asc" ? comparison : -comparison;
-    });
-
-    return filtered;
-  }, [enhancedSessions, filters, searchTerm, sortField, sortOrder]);
+    return filtered
+  }, [filters, searchTerm, sortField, sortOrder, sessions])
 
   const handleSort = (field) => {
     if (sortField === field) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+      setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))
     } else {
-      setSortField(field);
-      setSortOrder("desc");
+      setSortField(field)
+      setSortOrder('desc')
     }
-  };
+  }
 
   const getStatusConfig = (status) => {
-    switch (status) {
-      case "approved":
-        return {
-          badge: "bg-emerald-100 text-emerald-700 border-emerald-200",
-          icon: <CheckCircle className="w-3 h-3" />,
-          text: "Approved",
-          dot: "bg-emerald-500",
-        };
-      case "rejected":
-        return {
-          badge: "bg-red-100 text-red-700 border-red-200",
-          icon: <XCircle className="w-3 h-3" />,
-          text: "Rejected",
-          dot: "bg-red-500",
-        };
-      default:
-        return {
-          badge: "bg-amber-100 text-amber-700 border-amber-200",
-          icon: <AlertCircle className="w-3 h-3" />,
-          text: "Pending",
-          dot: "bg-amber-500",
-        };
+    const map = {
+      approved: {
+        badge: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+        icon: <CheckCircle className="w-3 h-3" />,
+        text: 'Approved',
+        dot: 'bg-emerald-500'
+      },
+      rejected: {
+        badge: 'bg-red-100 text-red-700 border-red-200',
+        icon: <XCircle className="w-3 h-3" />,
+        text: 'Rejected',
+        dot: 'bg-red-500'
+      },
+      pending: {
+        badge: 'bg-amber-100 text-amber-700 border-amber-200',
+        icon: <AlertCircle className="w-3 h-3" />,
+        text: 'Pending',
+        dot: 'bg-amber-500'
+      }
     }
-  };
+    return map[status] || map['pending']
+  }
 
   const clearAllFilters = () => {
-    setSearchTerm("");
-    setFilters({
-      status: "all",
-      dateRange: "all",
-      hoursRange: "all",
-    });
-  };
+    setSearchTerm('')
+    setFilters({ status: 'all', dateRange: 'all', hoursRange: 'all' })
+  }
 
   const hasActiveFilters =
-    searchTerm ||
-    filters.status !== "all" ||
-    filters.dateRange !== "all" ||
-    filters.hoursRange !== "all";
-  const [selectedImage, setSelectedImage] = useState(null);
+    !!searchTerm ||
+    filters.status !== 'all' ||
+    filters.dateRange !== 'all' ||
+    filters.hoursRange !== 'all'
 
   return (
     <div className="space-y-6 pb-20">
@@ -188,7 +135,7 @@ const PastSessions = ({ sessions }) => {
             <h1 className="text-2xl font-bold text-gray-900">Work History</h1>
             <p className="text-sm text-gray-500">
               {filteredAndSortedSessions.length} session
-              {filteredAndSortedSessions.length !== 1 ? "s" : ""} found
+              {filteredAndSortedSessions.length !== 1 ? 's' : ''} found
             </p>
           </div>
         </div>
@@ -197,15 +144,13 @@ const PastSessions = ({ sessions }) => {
           onClick={() => setShowFilters(!showFilters)}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
             showFilters || hasActiveFilters
-              ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-              : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+              ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+              : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
           }`}
         >
           <Filter className="w-4 h-4" />
           <span className="text-sm font-medium">Filters</span>
-          {hasActiveFilters && (
-            <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
-          )}
+          {hasActiveFilters && <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>}
         </button>
       </div>
 
@@ -238,7 +183,7 @@ const PastSessions = ({ sessions }) => {
                   onChange={(e) =>
                     setFilters((f) => ({
                       ...f,
-                      status: e.target.value,
+                      status: e.target.value
                     }))
                   }
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -259,7 +204,7 @@ const PastSessions = ({ sessions }) => {
                   onChange={(e) =>
                     setFilters((f) => ({
                       ...f,
-                      dateRange: e.target.value ,
+                      dateRange: e.target.value
                     }))
                   }
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -279,7 +224,7 @@ const PastSessions = ({ sessions }) => {
                   onChange={(e) =>
                     setFilters((f) => ({
                       ...f,
-                      hoursRange: e.target.value,
+                      hoursRange: e.target.value
                     }))
                   }
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -301,22 +246,22 @@ const PastSessions = ({ sessions }) => {
             </span>
             <div className="flex gap-1">
               {[
-                { field: "date", label: "Date" },
-                { field: "hours", label: "Hours" },
-                { field: "status", label: "Status" },
+                { field: 'date', label: 'Date' },
+                { field: 'hours', label: 'Hours' },
+                { field: 'status', label: 'Status' }
               ].map(({ field, label }) => (
                 <button
                   key={field}
                   onClick={() => handleSort(field)}
                   className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                     sortField === field
-                      ? "bg-indigo-100 text-indigo-700"
-                      : "text-gray-600 hover:bg-gray-100"
+                      ? 'bg-indigo-100 text-indigo-700'
+                      : 'text-gray-600 hover:bg-gray-100'
                   }`}
                 >
                   {label}
                   {sortField === field &&
-                    (sortOrder === "asc" ? (
+                    (sortOrder === 'asc' ? (
                       <SortAsc className="w-3 h-3" />
                     ) : (
                       <SortDesc className="w-3 h-3" />
@@ -341,8 +286,8 @@ const PastSessions = ({ sessions }) => {
       {filteredAndSortedSessions.length > 0 ? (
         <div className="space-y-3">
           {filteredAndSortedSessions.map((session) => {
-            const statusConfig = getStatusConfig(session.approvalStatus);
-            const isExpanded = expandedSession === session.id;
+            const statusConfig = getStatusConfig(session.approvalStatus)
+            const isExpanded = expandedSession === session.id
 
             return (
               <div
@@ -351,19 +296,17 @@ const PastSessions = ({ sessions }) => {
               >
                 <div
                   className="p-5"
-                  onClick={() =>
-                    setExpandedSession(isExpanded ? null : session.id)
-                  }
+                  onClick={() => setExpandedSession(isExpanded ? null : session.id)}
                 >
                   <div className="flex items-center justify-between">
                     {/* Left: Date and Status */}
                     <div className="flex items-center gap-4">
                       <div className="flex flex-col">
                         <div className="text-lg font-semibold text-gray-900">
-                          {dayjs(session.date).format("MMM DD")}
+                          {dayjs(session.date).format('MMM DD')}
                         </div>
                         <div className="text-xs text-gray-500">
-                          {dayjs(session.date).format("ddd")}
+                          {dayjs(session.date).format('ddd')}
                         </div>
                       </div>
 
@@ -372,9 +315,7 @@ const PastSessions = ({ sessions }) => {
                       <div
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium ${statusConfig.badge}`}
                       >
-                        <div
-                          className={`w-2 h-2 rounded-full ${statusConfig.dot}`}
-                        ></div>
+                        <div className={`w-2 h-2 rounded-full ${statusConfig.dot}`}></div>
                         {statusConfig.text}
                       </div>
                     </div>
@@ -384,9 +325,7 @@ const PastSessions = ({ sessions }) => {
                       <div className="text-right">
                         <div
                           className={`text-xl font-bold ${
-                            session.productiveHours >= 8
-                              ? "text-emerald-600"
-                              : "text-amber-600"
+                            session.productiveHours >= 8 ? 'text-emerald-600' : 'text-amber-600'
                           }`}
                         >
                           {session.productiveHours.toFixed(1)}h
@@ -405,23 +344,21 @@ const PastSessions = ({ sessions }) => {
                   </div>
 
                   {/* Quick Stats Row */}
-                  <div className="flex items-center gap-6 mt-4 pt-4 border-t border-gray-50">
+                  <div className="flex flex-wrap items-center gap-6 mt-4 pt-4 border-t border-gray-100">
+                    {/* Clock In */}
                     <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Clock className="w-4 h-4 text-blue-500" />
+                      <Clock className="w-4 h-4 text-green-500" />
+                      <span className="font-medium text-gray-800">Clock In:</span>
+                      <span>{dayjs(session.clockIn).format('hh:mm A')}</span>
+                    </div>
+
+                    {/* Clock Out */}
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Clock className="w-4 h-4 text-red-500" />
+                      <span className="font-medium text-gray-800">Clock Out:</span>
                       <span>
-                        {dayjs(session.clockIn).format("HH:mm")} -{" "}
-                        {session.clockOut
-                          ? dayjs(session.clockOut).format("HH:mm")
-                          : "Now"}
+                        {session.clockOut ? dayjs(session.clockOut).format('hh:mm A') : 'Ongoing'}
                       </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Camera className="w-4 h-4 text-purple-500" />
-                      <span>{session.screenshots.length}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Activity className="w-4 h-4 text-amber-500" />
-                      <span>{formatTime(session.idleMinutes)}</span>
                     </div>
                   </div>
                 </div>
@@ -437,9 +374,7 @@ const PastSessions = ({ sessions }) => {
                           <div className="text-lg font-bold text-gray-900">
                             {formatTime(session.totalMinutes)}
                           </div>
-                          <div className="text-xs text-gray-500">
-                            Total Time
-                          </div>
+                          <div className="text-xs text-gray-500">Total Time</div>
                         </div>
                         <div className="bg-white rounded-xl p-4 text-center border border-gray-100">
                           <Activity className="w-5 h-5 text-amber-500 mx-auto mb-2" />
@@ -452,21 +387,17 @@ const PastSessions = ({ sessions }) => {
                           <TrendingUp className="w-5 h-5 text-emerald-500 mx-auto mb-2" />
                           <div className="text-lg font-bold text-gray-900">
                             {(
-                              (session.productiveHours /
-                                (session.totalMinutes / 60)) *
+                              (session.productiveHours / (session.totalMinutes / 60)) *
                               100
                             ).toFixed(0)}
                             %
                           </div>
-                          <div className="text-xs text-gray-500">
-                            Efficiency
-                          </div>
+                          <div className="text-xs text-gray-500">Efficiency</div>
                         </div>
                       </div>
 
                       {/* Comments Section */}
-                      {(session.lessHoursComment ||
-                        session.approvalComment) && (
+                      {(session.lessHoursComment || session.managerComment) && (
                         <div className="space-y-3">
                           {session.lessHoursComment && (
                             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
@@ -486,7 +417,7 @@ const PastSessions = ({ sessions }) => {
                             </div>
                           )}
 
-                          {session.approvalComment && (
+                          {session.managerComment && (
                             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
                               <div className="flex items-start gap-3">
                                 <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -497,54 +428,11 @@ const PastSessions = ({ sessions }) => {
                                     Manager Feedback
                                   </div>
                                   <p className="text-sm text-blue-700 mb-2">
-                                    {session.approvalComment}
+                                    {session.managerComment}
                                   </p>
-                                  <div className="text-xs text-blue-600">
-                                    — {session.approvedBy} •{" "}
-                                    {dayjs(session.approvedAt).format(
-                                      "MMM DD, YYYY"
-                                    )}
-                                  </div>
                                 </div>
                               </div>
                             </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Screenshots Preview */}
-                      {session.screenshots.length > 0 && (
-                        <div>
-                          <div className="flex items-center justify-between mb-3">
-                            <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                              <Camera className="w-4 h-4 text-purple-500" />
-                              Screenshots ({session.screenshots.length})
-                            </h4>
-                          </div>
-                          <div className="grid grid-cols-4 gap-2">
-                            {session.screenshots
-                              .slice(0, 4)
-                              .map((screenshot, index) => (
-                                <div
-                                  key={index}
-                                  className="relative group"
-                                  onClick={() => setSelectedImage(screenshot)}
-                                >
-                                  <img
-                                    src={screenshot}
-                                    alt={`Screenshot ${index + 1}`}
-                                    className="w-full h-16 object-cover rounded-lg border border-gray-200 group-hover:border-purple-300 transition-colors"
-                                  />
-                                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded-lg flex items-center justify-center">
-                                    <Eye className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                                  </div>
-                                </div>
-                              ))}
-                          </div>
-                          {session.screenshots.length > 4 && (
-                            <p className="text-xs text-gray-500 mt-2 text-center">
-                              +{session.screenshots.length - 4} more screenshots
-                            </p>
                           )}
                         </div>
                       )}
@@ -552,7 +440,7 @@ const PastSessions = ({ sessions }) => {
                   </div>
                 )}
               </div>
-            );
+            )
           })}
         </div>
       ) : (
@@ -560,13 +448,11 @@ const PastSessions = ({ sessions }) => {
           <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <Calendar className="w-10 h-10 text-gray-400" />
           </div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            No sessions found
-          </h3>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">No sessions found</h3>
           <p className="text-gray-500 mb-6 max-w-md mx-auto">
             {hasActiveFilters
-              ? "No sessions match your current filters. Try adjusting your search criteria."
-              : "Your submitted work sessions will appear here once you complete and submit them."}
+              ? 'No sessions match your current filters. Try adjusting your search criteria.'
+              : 'Your submitted work sessions will appear here once you complete and submit them.'}
           </p>
           {hasActiveFilters && (
             <button
@@ -601,11 +487,11 @@ const PastSessions = ({ sessions }) => {
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
 PastSessions.propTypes = {
-  sessions: PropTypes.array.isRequired,
-};
+  sessions: PropTypes.array.isRequired
+}
 
-export default PastSessions;
+export default PastSessions

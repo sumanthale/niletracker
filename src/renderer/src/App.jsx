@@ -5,7 +5,6 @@ import { TimerProvider, useTimer } from './contexts/TimerContext'
 import AuthWrapper from './components/auth/AuthWrapper'
 import Dashboard from './components/Dashboard'
 import PastSessions from './components/PastSessions'
-import { ScreenshotProvider } from './contexts/SreenShotContext'
 
 function AppContent() {
   const { currentUser, userProfile, logout } = useAuth()
@@ -163,10 +162,8 @@ function App() {
   return (
     <AuthProvider>
       <TimerProvider>
-        <ScreenshotProvider>
           <Header />
           <AppContent />
-        </ScreenshotProvider>
       </TimerProvider>
     </AuthProvider>
   )

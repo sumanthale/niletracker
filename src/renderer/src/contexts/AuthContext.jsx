@@ -1,101 +1,84 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  updateProfile,
-} from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
-import { auth, db } from "../firebase/fire";
+  updateProfile
+} from 'firebase/auth'
+import { doc, setDoc, getDoc } from 'firebase/firestore'
+import { auth, db } from '../firebase/fire'
 
+const AuthContext = createContext(undefined)
 
-
-const AuthContext = createContext(undefined);
-
-// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+  const context = useContext(AuthContext)
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider')
   }
-  return context;
-};
+  return context
+}
 
+export const AuthProvider = ({ children }) => {
+  const [currentUser, setCurrentUser] = useState(null)
+  const [userProfile, setUserProfile] = useState(null)
+  const [loading, setLoading] = useState(true)
 
+  const fetchUserProfile = useCallback(async (user) => {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', user.uid))
+      if (userDoc.exists()) {
+        setUserProfile(userDoc.data())
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error)
+    }
+  }, [])
 
-export const AuthProvider = ({
-  // eslint-disable-next-line react/prop-types
-  children,
-}) => {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [userProfile, setUserProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const login = useCallback(async (email, password) => {
+    const result = await signInWithEmailAndPassword(auth, email, password)
+    await fetchUserProfile(result.user)
+  }, [fetchUserProfile])
 
-  const login = async (email, password) => {
-    await signInWithEmailAndPassword(auth, email, password);
+  const register = useCallback(async (email, password, fullName) => {
+    const result = await createUserWithEmailAndPassword(auth, email, password)
 
-    // // Update last login
-    // const userRef = doc(db, 'users', result.user.uid);
-    // await setDoc(userRef, {
-    //   lastLogin: new Date().toISOString()
-    // }, { merge: true });
-  };
-
-  const register = async (
-    email,
-    password,
-    fullName
-  ) => {
-    const result = await createUserWithEmailAndPassword(auth, email, password);
-
-    // Update the user's display name
     await updateProfile(result.user, {
-      displayName: fullName,
-    });
+      displayName: fullName
+    })
 
-    // Create user profile in Firestore
     const userProfile = {
       uid: result.user.uid,
       email: result.user.email,
       fullName,
       createdAt: new Date().toISOString(),
       lastLogin: new Date().toISOString(),
-      role: "employee", // Default role
-    };
-
-    await setDoc(doc(db, "users", result.user.uid), userProfile);
-  };
-
-  const logout = async () => {
-    await signOut(auth);
-    setUserProfile(null);
-  };
-
-  const fetchUserProfile = async (user) => {
-    try {
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (userDoc.exists()) {
-        setUserProfile(userDoc.data());
-      }
-    } catch (error) {
-      console.error("Error fetching user profile:", error);
+      secret:password,
+      role: 'employee'
     }
-  };
+
+    await setDoc(doc(db, 'users', result.user.uid), userProfile)
+    setUserProfile(userProfile)
+  }, [])
+
+  const logout = useCallback(async () => {
+    await signOut(auth)
+    setUserProfile(null)
+    setCurrentUser(null)
+  }, [])
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user);
+      setCurrentUser(user)
       if (user) {
-        await fetchUserProfile(user);
+        await fetchUserProfile(user)
       } else {
-        setUserProfile(null);
+        setUserProfile(null)
       }
-      setLoading(false);
-    });
-
-    return unsubscribe;
-  }, []);
+      setLoading(false)
+    })
+    return unsubscribe
+  }, [fetchUserProfile])
 
   const value = {
     currentUser,
@@ -103,12 +86,8 @@ export const AuthProvider = ({
     login,
     register,
     logout,
-    loading,
-  };
+    loading
+  }
 
-  return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
-    </AuthContext.Provider>
-  );
-};
+  return <AuthContext.Provider value={value}>{!loading && children}</AuthContext.Provider>
+}

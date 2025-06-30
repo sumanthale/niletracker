@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect } from 'react'
 import {
   Play,
   Square,
@@ -13,24 +13,23 @@ import {
   Calendar,
   Clock,
   AlertTriangle,
-  RotateCcw,
-} from "lucide-react";
-import { useTimer } from "../contexts/TimerContext";
-import { useAuth } from "../contexts/AuthContext";
-import { FirebaseService } from "../services/firebaseService";
+  RotateCcw
+} from 'lucide-react'
+import { useTimer } from '../contexts/TimerContext'
+import { useAuth } from '../contexts/AuthContext'
+import { FirebaseService } from '../services/firebaseService'
 import {
   calculateProductiveHours,
   formatDate,
   formatDecimalHoursToHHMM,
-  formatTime,
-} from "../utils/timeUtils";
-import Timer from "./Timer";
-import IdleTracker from "./IdleTracker";
-import ScreenshotGallery from "./ScreenshotGallery";
-import SubmissionForm from "./SubmissionForm";
+  formatTime
+} from '../utils/timeUtils'
+import Timer from './Timer'
+import IdleTracker from './IdleTracker'
+import SubmissionForm from './SubmissionForm'
 
 const Dashboard = () => {
-  const { currentUser } = useAuth();
+  const { currentUser } = useAuth()
   const {
     isWorking,
     currentSession,
@@ -44,77 +43,75 @@ const Dashboard = () => {
     submitSession,
     showSubmissionForm,
     setShowSubmissionForm,
-    setSessions,
-  } = useTimer();
+    setSessions
+  } = useTimer()
 
-  const [todaySession, setTodaySession] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [checkingTodaySession, setCheckingTodaySession] = useState(true);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [todaySession, setTodaySession] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [checkingTodaySession, setCheckingTodaySession] = useState(true)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
 
   // Check if user has already submitted today's session
   useEffect(() => {
     const checkTodaySession = async () => {
-      if (!currentUser) return;
+      if (!currentUser) return
 
       try {
-        const session = await FirebaseService.getTodaySession(currentUser.uid);
-        setTodaySession(session);
+        const session = await FirebaseService.getTodaySession(currentUser.uid)
+        setTodaySession(session)
       } catch (error) {
-        console.error("Error checking today session:", error);
+        console.error('Error checking today session:', error)
       } finally {
-        setCheckingTodaySession(false);
+        setCheckingTodaySession(false)
       }
-    };
+    }
 
-    checkTodaySession();
-  }, [currentUser]);
+    checkTodaySession()
+  }, [currentUser])
 
   const handleSubmit = async (comment) => {
     try {
-      await submitSession(comment);
+      await submitSession(comment)
       // Refresh today's session after submission
-      const session = await FirebaseService.getTodaySession(currentUser?.uid);
-      setTodaySession(session);
+      const session = await FirebaseService.getTodaySession(currentUser?.uid)
+      setTodaySession(session)
     } catch (error) {
-      console.error("Error submitting session:", error);
+      console.error('Error submitting session:', error)
     }
-  };
+  }
 
   const handleCancelSubmission = () => {
-    setShowSubmissionForm(false);
-  };
+    setShowSubmissionForm(false)
+  }
 
   const handleDeleteTodaySession = async () => {
-    if (!todaySession || !currentUser) return;
+    if (!todaySession || !currentUser) return
 
-    setIsDeleting(true);
+    setIsDeleting(true)
     try {
-      await FirebaseService.deleteSession(todaySession.id);
-      setTodaySession(null);
+      await FirebaseService.deleteSession(todaySession.id)
+      setTodaySession(null)
       // Optionally, deltete the session from local state
-      setSessions((prev) => prev.filter((s) => s.id !== todaySession.id));
+      setSessions((prev) => prev.filter((s) => s.id !== todaySession.id))
     } catch (error) {
-      console.error("Error deleting session:", error);
+      console.error('Error deleting session:', error)
     } finally {
-      setIsDeleting(false);
+      setIsDeleting(false)
     }
-  };
+  }
 
   const handleCancelWork = () => {
-    setShowCancelConfirm(false);
-    cancelWork();
-  };
+    setShowCancelConfirm(false)
+    cancelWork()
+  }
 
   const currentProductiveHours = calculateProductiveHours(
     Math.floor(elapsedSeconds / 60),
     totalIdleMinutes
-  );
+  )
 
-  const formattedProductiveTime = formatDecimalHoursToHHMM(
-    currentProductiveHours
-  );
+  const formattedProductiveTime = formatDecimalHoursToHHMM(currentProductiveHours)
 
   // Show loading while checking today's session
   if (checkingTodaySession) {
@@ -125,7 +122,7 @@ const Dashboard = () => {
           <p className="text-gray-600">Checking today&#39;s productivity...</p>
         </div>
       </div>
-    );
+    )
   }
 
   // Show today's session summary if already submitted
@@ -142,9 +139,7 @@ const Dashboard = () => {
               </div>
 
               {/* Title & Description */}
-              <h2 className="text-2xl font-semibold text-green-900 mb-2">
-                Productivity Logged
-              </h2>
+              <h2 className="text-2xl font-semibold text-green-900 mb-2">Productivity Logged</h2>
               <p className="text-green-700 mb-8">
                 You&#39;sve successfully submitted your session for today.
               </p>
@@ -162,19 +157,16 @@ const Dashboard = () => {
                     <p className="mb-1">Status</p>
                     <span
                       className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                        todaySession.approvalStatus === "approved"
-                          ? "bg-green-100 text-green-800"
-                          : todaySession.approvalStatus === "rejected"
-                          ? "bg-red-100 text-red-800"
-                          : "bg-amber-100 text-amber-800"
+                        todaySession.approvalStatus === 'approved'
+                          ? 'bg-green-100 text-green-800'
+                          : todaySession.approvalStatus === 'rejected'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-amber-100 text-amber-800'
                       }`}
                     >
-                      {todaySession.approvalStatus === "approved" &&
-                        "✓ Approved"}
-                      {todaySession.approvalStatus === "rejected" &&
-                        "✗ Rejected"}
-                      {todaySession.approvalStatus === "pending" &&
-                        "⏳ Pending"}
+                      {todaySession.approvalStatus === 'approved' && '✓ Approved'}
+                      {todaySession.approvalStatus === 'rejected' && '✗ Rejected'}
+                      {todaySession.approvalStatus === 'pending' && '⏳ Pending'}
                     </span>
                   </div>
                 </div>
@@ -190,11 +182,11 @@ const Dashboard = () => {
                     value={`${todaySession.productiveHours.toFixed(1)}h`}
                     color="text-green-600"
                   />
-                  <SummaryItem
+                  {/* <SummaryItem
                     label="Screenshots"
                     value={todaySession.screenshots.length}
                     color="text-purple-600"
-                  />
+                  /> */}
                 </div>
               </div>
 
@@ -204,13 +196,10 @@ const Dashboard = () => {
                   <Clock className="w-4 h-4 text-blue-500" />
                   <span>Clock In:</span>
                   <span className="font-medium">
-                    {new Date(todaySession.clockIn).toLocaleTimeString(
-                      "en-US",
-                      {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      }
-                    )}
+                    {new Date(todaySession.clockIn).toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -218,14 +207,11 @@ const Dashboard = () => {
                   <span>Clock Out:</span>
                   <span className="font-medium">
                     {todaySession.clockOut
-                      ? new Date(todaySession.clockOut).toLocaleTimeString(
-                          "en-US",
-                          {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }
-                        )
-                      : "N/A"}
+                      ? new Date(todaySession.clockOut).toLocaleTimeString('en-US', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })
+                      : 'N/A'}
                   </span>
                 </div>
               </div>
@@ -233,12 +219,8 @@ const Dashboard = () => {
               {/* Comment Section */}
               {todaySession.lessHoursComment && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-left shadow-sm">
-                  <div className="text-sm font-semibold text-amber-800 mb-1">
-                    Your Note
-                  </div>
-                  <p className="text-sm text-amber-700">
-                    {todaySession.lessHoursComment}
-                  </p>
+                  <div className="text-sm font-semibold text-amber-800 mb-1">Your Note</div>
+                  <p className="text-sm text-amber-700">{todaySession.lessHoursComment}</p>
                 </div>
               )}
 
@@ -276,33 +258,28 @@ const Dashboard = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <StatCard
-                icon={todaySession.productiveHours >= 8 ? "✅" : "⚠️"}
-                title={
-                  todaySession.productiveHours >= 8 ? "Full Day" : "Partial Day"
-                }
+                icon={todaySession.productiveHours >= 8 ? '✅' : '⚠️'}
+                title={todaySession.productiveHours >= 8 ? 'Full Day' : 'Partial Day'}
                 value={`${todaySession.productiveHours.toFixed(1)}h`}
                 note="of 8h goal"
                 color="blue"
               />
-              <StatCard
+              {/* <StatCard
                 icon="📸"
                 title="Screenshots"
                 value={todaySession.screenshots.length}
                 note="captured"
                 color="purple"
-              />
+              /> */}
             </div>
           </div>
         </div>
         {showConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
             <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                Confirm Deletion
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">Confirm Deletion</h3>
               <p className="text-sm text-gray-600 mb-6">
-                Are you sure you want to delete today&#39;ss session? This action
-                cannot be undone.
+                Are you sure you want to delete today&#39;ss session? This action cannot be undone.
               </p>
 
               <div className="flex justify-end gap-3">
@@ -314,19 +291,19 @@ const Dashboard = () => {
                 </button>
                 <button
                   onClick={() => {
-                    handleDeleteTodaySession();
-                    setShowConfirm(false);
+                    handleDeleteTodaySession()
+                    setShowConfirm(false)
                   }}
                   className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition"
                 >
-                  {isDeleting ? "Deleting..." : "Confirm"}
+                  {isDeleting ? 'Deleting...' : 'Confirm'}
                 </button>
               </div>
             </div>
           </div>
         )}
       </>
-    );
+    )
   }
 
   return (
@@ -348,9 +325,7 @@ const Dashboard = () => {
                   </div>
                   <div className="text-left">
                     <div className="text-lg font-bold">Start Working</div>
-                    <div className="text-xs opacity-90">
-                      Begin your productive session
-                    </div>
+                    <div className="text-xs opacity-90">Begin your productive session</div>
                   </div>
                 </div>
               </button>
@@ -364,9 +339,9 @@ const Dashboard = () => {
                   <RotateCcw className="w-4 h-4" />
                   <div className="text-left leading-tight">
                     <div className="font-semibold">
-                     Restart    
-                       <br />
-                       <span className="text-xs font-normal">Cancel Session</span>
+                      Restart
+                      <br />
+                      <span className="text-xs font-normal">Cancel Session</span>
                     </div>
                   </div>
                 </button>
@@ -378,9 +353,7 @@ const Dashboard = () => {
                   <Square className="w-4 h-4" />
                   <div className="text-left leading-tight">
                     <div className="font-semibold">End Session</div>
-                    <div className="text-xs font-normal opacity-90">
-                      Submit time
-                    </div>
+                    <div className="text-xs font-normal opacity-90">Submit time</div>
                   </div>
                 </button>
               </div>
@@ -423,47 +396,18 @@ const Dashboard = () => {
                   <span
                     className={`px-2 py-0.5 rounded-full font-medium ${
                       currentProductiveHours >= 8
-                        ? "bg-green-100 text-green-700"
-                        : "bg-amber-100 text-amber-700"
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-amber-100 text-amber-700'
                     }`}
                   >
-                    {currentProductiveHours >= 8 ? "On Track" : "In Progress"}
+                    {currentProductiveHours >= 8 ? 'On Track' : 'In Progress'}
                   </span>
                 </div>
               </div>
-
-              {/* Efficiency */}
-              {/* <div className="bg-gradient-to-br from-emerald-50 to-green-100 rounded-xl p-4 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-green-600 rounded-lg flex items-center justify-center shadow">
-                    <TrendingUp className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xl font-bold text-emerald-900">
-                      {efficiencyPercentage}%
-                    </div>
-                    <div className="text-[11px] text-emerald-700 tracking-wide uppercase">
-                      Efficiency
-                    </div>
-                  </div>
-                </div>
-                <div className="w-full bg-emerald-200/50 rounded-full h-2">
-                  <div
-                    className="bg-gradient-to-r from-emerald-500 to-green-500 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(efficiencyPercentage, 100)}%` }}
-                  ></div>
-                </div>
-              </div> */}
             </div>
 
             {/* Secondary Stats */}
-            <div className="grid grid-cols-3 gap-3">
-              <MiniStat
-                icon={<Camera className="w-4 h-4 text-purple-600" />}
-                value={screenshots.length}
-                label="Screenshots"
-                bg="purple-100"
-              />
+            <div className="grid grid-cols-2 gap-3">
               <MiniStat
                 icon={<Activity className="w-4 h-4 text-amber-600" />}
                 value={idleEvents.length}
@@ -483,21 +427,14 @@ const Dashboard = () => {
               <div className="flex items-center justify-between mb-2 text-[13px] font-medium text-gray-700">
                 <span>Daily Progress</span>
                 <span className="text-xs text-gray-500">
-                  {Math.min(
-                    Math.round((currentProductiveHours / 8) * 100),
-                    100
-                  )}
-                  % Complete
+                  {Math.min(Math.round((currentProductiveHours / 8) * 100), 100)}% Complete
                 </span>
               </div>
               <div className="w-full bg-gray-200 h-2 rounded-full mb-1 overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-500"
                   style={{
-                    width: `${Math.min(
-                      (currentProductiveHours / 8) * 100,
-                      100
-                    )}%`,
+                    width: `${Math.min((currentProductiveHours / 8) * 100, 100)}%`
                   }}
                 />
               </div>
@@ -513,11 +450,8 @@ const Dashboard = () => {
         {/* Enhanced Activity Sections */}
         {isWorking && (
           <div className="space-y-6">
-            <IdleTracker
-              idleEvents={idleEvents}
-              totalIdleMinutes={totalIdleMinutes}
-            />
-            <ScreenshotGallery screenshots={screenshots} />
+            <IdleTracker idleEvents={idleEvents} totalIdleMinutes={totalIdleMinutes} />
+            {/* <ScreenshotGallery screenshots={screenshots} /> */}
           </div>
         )}
 
@@ -527,37 +461,23 @@ const Dashboard = () => {
             <div className="w-20 h-20 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <BarChart3 className="w-10 h-10 text-blue-600" />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">
-              Ready to be productive?
-            </h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Ready to be productive?</h3>
             <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              Start your work session to begin tracking time, capturing
-              screenshots, and monitoring your productivity.
+              Start your work session to begin tracking time and monitoring your productivity.
             </p>
-            <div className="grid grid-cols-3 gap-4 max-w-sm mx-auto">
+            <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
               <div className="text-center">
                 <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mx-auto mb-2">
                   <Target className="w-6 h-6 text-blue-600" />
                 </div>
-                <div className="text-xs font-medium text-gray-600">
-                  Track Time
-                </div>
+                <div className="text-xs font-medium text-gray-600">Track Time</div>
               </div>
-              <div className="text-center">
-                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-2">
-                  <Camera className="w-6 h-6 text-purple-600" />
-                </div>
-                <div className="text-xs font-medium text-gray-600">
-                  Screenshots
-                </div>
-              </div>
+
               <div className="text-center">
                 <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mx-auto mb-2">
                   <TrendingUp className="w-6 h-6 text-emerald-600" />
                 </div>
-                <div className="text-xs font-medium text-gray-600">
-                  Analytics
-                </div>
+                <div className="text-xs font-medium text-gray-600">Analytics</div>
               </div>
             </div>
           </div>
@@ -582,12 +502,8 @@ const Dashboard = () => {
                 <AlertTriangle className="w-5 h-5 text-amber-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-800">
-                  Cancel Current Session?
-                </h3>
-                <p className="text-sm text-gray-600">
-                  This will discard all progress
-                </p>
+                <h3 className="text-lg font-semibold text-gray-800">Cancel Current Session?</h3>
+                <p className="text-sm text-gray-600">This will discard all progress</p>
               </div>
             </div>
 
@@ -595,10 +511,7 @@ const Dashboard = () => {
               <div className="text-sm text-amber-800">
                 <p className="font-medium mb-2">You will lose:</p>
                 <ul className="space-y-1 text-xs">
-                  <li>
-                    • {formatTime(Math.floor(elapsedSeconds / 60))} hrs of tracked
-                    time
-                  </li>
+                  <li>• {formatTime(Math.floor(elapsedSeconds / 60))} hrs of tracked time</li>
                   <li>• {screenshots.length} captured screenshots</li>
                   <li>• {idleEvents.length} idle events</li>
                 </ul>
@@ -623,75 +536,51 @@ const Dashboard = () => {
         </div>
       )}
     </>
-  );
-};
+  )
+}
 
-export default Dashboard;
+export default Dashboard
 
-import PropTypes from "prop-types";
+import PropTypes from 'prop-types'
 
-const MiniStat = ({
-  icon,
-  value,
-  label,
-  bg,
-}) => (
+const MiniStat = ({ icon, value, label, bg }) => (
   <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm text-center">
-    <div
-      className={`w-8 h-8 rounded-md flex items-center justify-center mx-auto mb-1 bg-${bg}`}
-    >
+    <div className={`w-8 h-8 rounded-md flex items-center justify-center mx-auto mb-1 bg-${bg}`}>
       {icon}
     </div>
     <div className="text-lg font-bold text-gray-900">{value}</div>
     <div className="text-xs text-gray-600">{label}</div>
   </div>
-);
+)
 
 MiniStat.propTypes = {
   icon: PropTypes.node.isRequired,
   value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
   label: PropTypes.string.isRequired,
-  bg: PropTypes.string.isRequired,
-};
+  bg: PropTypes.string.isRequired
+}
 
-const SummaryItem = ({
-  label,
-  value,
-  color,
-}) => (
+const SummaryItem = ({ label, value, color }) => (
   <div className="text-center">
     <div className={`text-2xl font-semibold ${color}`}>{value}</div>
     <div className="text-xs text-gray-600">{label}</div>
   </div>
-);
+)
 
 SummaryItem.propTypes = {
   label: PropTypes.string.isRequired,
   value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-  color: PropTypes.string.isRequired,
-};
+  color: PropTypes.string.isRequired
+}
 
-const StatCard = ({
-  icon,
-  title,
-  value,
-  note,
-  color,
-}) => {
+const StatCard = ({ icon, title, value, note, color }) => {
   const colorMap = {
-    blue: ["from-blue-50", "to-indigo-100", "text-blue-900", "text-blue-600"],
-    purple: [
-      "from-purple-50",
-      "to-pink-100",
-      "text-purple-900",
-      "text-purple-600",
-    ],
-  }[color] || ["from-gray-50", "to-gray-100", "text-gray-900", "text-gray-600"];
+    blue: ['from-blue-50', 'to-indigo-100', 'text-blue-900', 'text-blue-600'],
+    purple: ['from-purple-50', 'to-pink-100', 'text-purple-900', 'text-purple-600']
+  }[color] || ['from-gray-50', 'to-gray-100', 'text-gray-900', 'text-gray-600']
 
   return (
-    <div
-      className={`bg-gradient-to-br ${colorMap[0]} ${colorMap[1]} rounded-xl p-4`}
-    >
+    <div className={`bg-gradient-to-br ${colorMap[0]} ${colorMap[1]} rounded-xl p-4`}>
       <div className="flex items-center justify-between">
         <div>
           <div className={`text-2xl font-bold ${colorMap[2]}`}>{icon}</div>
@@ -703,14 +592,13 @@ const StatCard = ({
         </div>
       </div>
     </div>
-  );
-};
-
+  )
+}
 
 StatCard.propTypes = {
   icon: PropTypes.node.isRequired,
   title: PropTypes.string.isRequired,
   value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
   note: PropTypes.string.isRequired,
-  color: PropTypes.string.isRequired,
-};
+  color: PropTypes.string.isRequired
+}
