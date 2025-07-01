@@ -16,12 +16,13 @@ import icon from '../../resources/icon.png?asset'
 let screenshotInterval = null
 let idlePollingInterval = null
 let mainWindow = null
+let tray = null
 let systemSleepStartedAt = null
 let lockStartedAt = null
 let isTrackingIdle = false
 let wasIdle = false
 const COMPRESSION_QUALITY = 50
-const IDLE_THRESHOLD = 60 * 1 // 60 seconds
+const IDLE_THRESHOLD = 60 // seconds
 
 function setupPowerMonitorEvents() {
   powerMonitor.on('suspend', () => {
@@ -91,26 +92,26 @@ function createWindow() {
     }
   })
 
-  mainWindow.on('close', (e) => {
+mainWindow.on('close', (e) => {
+  if (!app.isQuiting) {
     e.preventDefault()
     mainWindow.hide()
-  })
+  }
+})
 
   mainWindow.on('closed', () => {
     clearInterval(screenshotInterval)
-    screenshotInterval = null
     clearInterval(idlePollingInterval)
+    screenshotInterval = null
     idlePollingInterval = null
   })
 
-  // External link handling
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
 
-  // Window frame control
-  ipcMain.on('frame-action', (event, action) => {
+  ipcMain.on('frame-action', (_, action) => {
     if (!mainWindow) return
     switch (action) {
       case 'MINIMIZE':
@@ -125,7 +126,6 @@ function createWindow() {
     }
   })
 
-  // Idle tracking
   ipcMain.handle('start-idle-tracking', () => {
     console.log('🟡 start-idle-tracking invoked')
     if (isTrackingIdle) return
@@ -154,7 +154,6 @@ function createWindow() {
     wasIdle = false
   })
 
-  // Screenshot capturing
   const primaryDisplay = screen.getPrimaryDisplay()
   const { width, height } = primaryDisplay.size
 
@@ -194,7 +193,6 @@ function createWindow() {
     }
   })
 
-  // Load app
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -202,40 +200,64 @@ function createWindow() {
   }
 }
 
-let tray = null
-
-// App ready
-app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.electron')
-  setupPowerMonitorEvents()
-
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
-  })
-
-  ipcMain.on('ping', () => console.log('pong'))
-
-  createWindow()
-
-  tray = new Tray(path.join(__dirname, '../../resources/icon.png'))
-  const contextMenu = Menu.buildFromTemplate([
-    { label: 'Show App', click: () => mainWindow?.show() },
-    {
-      label: 'Quit',
-      click: () => {
-        app.isQuiting = true
-        app.quit()
-      }
+// 🚨 SINGLE INSTANCE LOCK: Prevent multiple app instances
+const gotTheLock = app.requestSingleInstanceLock()
+if (!gotTheLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
     }
-  ])
-  tray.setToolTip('Time Tracker')
-  tray.setContextMenu(contextMenu)
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
-})
 
+  app.whenReady().then(() => {
+    app.isQuiting = false;
+    electronApp.setAppUserModelId('com.electron')
+    setupPowerMonitorEvents()
+
+    app.on('browser-window-created', (_, window) => {
+      optimizer.watchWindowShortcuts(window)
+    })
+
+    ipcMain.on('ping', () => console.log('pong'))
+
+    createWindow()
+
+    // 🔔 Tray setup
+    tray = new Tray(path.join(__dirname, '../../resources/icon.png'))
+    tray.setToolTip('Time Tracker')
+    const contextMenu = Menu.buildFromTemplate([
+      { label: 'Show App', click: () => mainWindow?.show() },
+      {
+        label: 'Quit',
+        click: () => {
+          app.isQuiting = true
+          app.quit()
+        }
+      }
+    ])
+    tray.setContextMenu(contextMenu)
+
+    // 👆 Clicking the tray icon shows the app
+    tray.on('click', () => {
+      if (mainWindow) {
+        mainWindow.show()
+        mainWindow.focus()
+      }
+    })
+
+    // macOS dock behavior
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+      else mainWindow?.show()
+    })
+  })
+}
+
+// Close behavior
 app.on('window-all-closed', () => {
   if (process.platform === 'darwin') {
     app.dock.hide()
