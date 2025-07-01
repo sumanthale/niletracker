@@ -70,7 +70,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 460,
     height: 670,
-    minWidth:460,
+    minWidth: 460,
     show: false,
     frame: false,
     autoHideMenuBar: true,
@@ -93,12 +93,12 @@ function createWindow() {
     }
   })
 
-mainWindow.on('close', (e) => {
-  if (!app.isQuiting) {
-    e.preventDefault()
-    mainWindow.hide()
-  }
-})
+  mainWindow.on('close', (e) => {
+    if (!app.isQuiting) {
+      e.preventDefault()
+      mainWindow.hide()
+    }
+  })
 
   mainWindow.on('closed', () => {
     clearInterval(screenshotInterval)
@@ -162,28 +162,38 @@ mainWindow.on('close', (e) => {
     console.log('📸 Screenshot capture started')
     if (screenshotInterval) return
 
-    screenshotInterval = setInterval(async () => {
-      const sources = await desktopCapturer.getSources({
-        types: ['screen'],
-        thumbnailSize: { width, height }
-      })
-      const screenSource = sources.find(
-        (src) => src.name === 'Entire Screen' || src.name === 'Screen 1'
-      )
+    screenshotInterval = setInterval(
+      async () => {
+        console.log('⏱️ Taking screenshot...')
 
-      if (!screenSource) {
-        console.warn('No screen source found')
-        return
-      }
+        const sources = await desktopCapturer.getSources({
+          types: ['screen'],
+          thumbnailSize: { width, height }
+        })
+        console.log(
+          '🔍 Sources:',
+          sources.map((s) => s.name)
+        )
 
-      const jpegBuffer = screenSource.thumbnail.toJPEG(COMPRESSION_QUALITY)
-      const base64 = `data:image/jpeg;base64,${jpegBuffer.toString('base64')}`
+        const screenSource = sources.find((src) => src.name.includes('Screen')) || sources[0]
 
-      mainWindow?.webContents.send('screenshot-taken', {
-        timestamp: new Date().toISOString(),
-        image: base64
-      })
-    }, 10 * 60 * 1000) // every 10 minutes
+        if (!screenSource || screenSource.thumbnail.isEmpty()) {
+          console.warn('❌ No valid screen source found or empty thumbnail')
+          return
+        }
+
+        const jpegBuffer = screenSource.thumbnail.toJPEG(COMPRESSION_QUALITY)
+        const base64 = `data:image/jpeg;base64,${jpegBuffer.toString('base64')}`
+
+        mainWindow?.webContents.send('screenshot-taken', {
+          timestamp: new Date().toISOString(),
+          image: base64
+        })
+      },
+      10 * 60 * 1000
+    )
+
+    // every 10 minutes
   })
 
   ipcMain.handle('stop-screenshot-capture', () => {
@@ -215,7 +225,7 @@ if (!gotTheLock) {
   })
 
   app.whenReady().then(() => {
-    app.isQuiting = false;
+    app.isQuiting = false
     electronApp.setAppUserModelId('com.electron')
     setupPowerMonitorEvents()
 
