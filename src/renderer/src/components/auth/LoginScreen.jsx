@@ -1,38 +1,55 @@
-import { useState } from 'react';
-import { Eye, EyeOff, Mail, Lock,  ArrowRight, UserPlus, Sparkles } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import PropTypes from 'prop-types';
-import { handleFirebaseError } from '../../utils/timeUtils';
-
-
+import { useState } from 'react'
+import { Eye, EyeOff, Mail, Lock, ArrowRight, UserPlus, Sparkles } from 'lucide-react'
+import { useAuth } from '../../contexts/AuthContext'
+import PropTypes from 'prop-types'
+import { handleFirebaseError } from '../../utils/timeUtils'
+// AuthContext.js
 
 const LoginScreen = ({ onSwitchToRegister }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  const { login } = useAuth();
+  const { login, resetPassword } = useAuth()
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!email || !password) return;
+    e.preventDefault()
+    if (!email || !password) return
 
-    setIsLoading(true);
-    setError('');
+    setIsLoading(true)
+    setError('')
 
     try {
-      await login(email, password);
+      await login(email, password)
     } catch (error) {
-      const errorMessage = handleFirebaseError(error);
-      setError(errorMessage || 'Failed to sign in');
+      const errorMessage = handleFirebaseError(error)
+      setError(errorMessage || 'Failed to sign in')
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError('Please enter your email to reset password.')
+      return
+    }
 
+    setIsLoading(true)
+    setError('')
 
+    try {
+      await resetPassword(email) // If your context doesn't support this, use Firebase directly:
+      // await sendPasswordResetEmail(auth, email);
+      alert('Password reset email sent. Please check your inbox.')
+    } catch (error) {
+      const errorMessage = handleFirebaseError(error)
+      setError(errorMessage || 'Failed to send password reset email')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4 mt-[40px]">
@@ -59,9 +76,7 @@ const LoginScreen = ({ onSwitchToRegister }) => {
 
             {/* Email Field */}
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-700 block">
-                Email Address
-              </label>
+              <label className="text-sm font-semibold text-gray-700 block">Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
@@ -77,9 +92,7 @@ const LoginScreen = ({ onSwitchToRegister }) => {
 
             {/* Password Field */}
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-700 block">
-                Password
-              </label>
+              <label className="text-sm font-semibold text-gray-700 block">Password</label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
@@ -96,6 +109,15 @@ const LoginScreen = ({ onSwitchToRegister }) => {
                   className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  className="text-sm text-blue-600 hover:underline hover:text-blue-700 font-medium"
+                >
+                  Forgot Password?
                 </button>
               </div>
             </div>
@@ -133,10 +155,10 @@ const LoginScreen = ({ onSwitchToRegister }) => {
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 LoginScreen.propTypes = {
-  onSwitchToRegister: PropTypes.func.isRequired,
-};
+  onSwitchToRegister: PropTypes.func.isRequired
+}
 
-export default LoginScreen;
+export default LoginScreen

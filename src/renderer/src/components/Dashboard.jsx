@@ -4,7 +4,6 @@ import {
   Square,
   BarChart3,
   Activity,
-  Camera,
   Zap,
   Target,
   TrendingUp,
@@ -35,7 +34,6 @@ const Dashboard = () => {
     currentSession,
     elapsedSeconds,
     idleEvents,
-    screenshots,
     totalIdleMinutes,
     startWork,
     stopWork,
@@ -58,7 +56,7 @@ const Dashboard = () => {
       if (!currentUser) return
 
       try {
-        const session = await FirebaseService.getTodaySession(currentUser.uid)
+        const session = await FirebaseService.getTodaySession(currentUser.uid);        
         setTodaySession(session)
       } catch (error) {
         console.error('Error checking today session:', error)
@@ -73,11 +71,12 @@ const Dashboard = () => {
   const handleSubmit = async (comment) => {
     try {
       await submitSession(comment)
-      // Refresh today's session after submission
       const session = await FirebaseService.getTodaySession(currentUser?.uid)
       setTodaySession(session)
+      return true
     } catch (error) {
       console.error('Error submitting session:', error)
+      return false
     }
   }
 
@@ -91,9 +90,8 @@ const Dashboard = () => {
     setIsDeleting(true)
     try {
       await FirebaseService.deleteSession(todaySession.id)
-      setTodaySession(null)
-      // Optionally, deltete the session from local state
       setSessions((prev) => prev.filter((s) => s.id !== todaySession.id))
+      setTodaySession(null)
     } catch (error) {
       console.error('Error deleting session:', error)
     } finally {
@@ -171,7 +169,7 @@ const Dashboard = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-6">
+                <div className="grid grid-cols-2 gap-6">
                   <SummaryItem
                     label="Total Time"
                     value={formatTime(todaySession.totalMinutes)}
@@ -179,14 +177,9 @@ const Dashboard = () => {
                   />
                   <SummaryItem
                     label="Productive"
-                    value={`${todaySession.productiveHours.toFixed(1)}h`}
+                    value={`${formatDecimalHoursToHHMM(todaySession.productiveHours)}`}
                     color="text-green-600"
                   />
-                  {/* <SummaryItem
-                    label="Screenshots"
-                    value={todaySession.screenshots.length}
-                    color="text-purple-600"
-                  /> */}
                 </div>
               </div>
 
@@ -253,10 +246,10 @@ const Dashboard = () => {
           <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <Calendar className="w-5 h-5 text-blue-500" />
-              Today&#39;ss Summary
+              Today&#39;s Summary
             </h3>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <StatCard
                 icon={todaySession.productiveHours >= 8 ? '✅' : '⚠️'}
                 title={todaySession.productiveHours >= 8 ? 'Full Day' : 'Partial Day'}
@@ -264,13 +257,6 @@ const Dashboard = () => {
                 note="of 8h goal"
                 color="blue"
               />
-              {/* <StatCard
-                icon="📸"
-                title="Screenshots"
-                value={todaySession.screenshots.length}
-                note="captured"
-                color="purple"
-              /> */}
             </div>
           </div>
         </div>
@@ -384,7 +370,7 @@ const Dashboard = () => {
                   <div className="text-right">
                     <div className="text-xl font-bold text-blue-900">
                       {/* {currentProductiveHours.toFixed(1)}h */}
-                      {formattedProductiveTime} hrs
+                      {formattedProductiveTime}
                     </div>
                     <div className="text-[11px] text-blue-700 tracking-wide uppercase">
                       Productive
@@ -451,7 +437,6 @@ const Dashboard = () => {
         {isWorking && (
           <div className="space-y-6">
             <IdleTracker idleEvents={idleEvents} totalIdleMinutes={totalIdleMinutes} />
-            {/* <ScreenshotGallery screenshots={screenshots} /> */}
           </div>
         )}
 
@@ -512,7 +497,6 @@ const Dashboard = () => {
                 <p className="font-medium mb-2">You will lose:</p>
                 <ul className="space-y-1 text-xs">
                   <li>• {formatTime(Math.floor(elapsedSeconds / 60))} hrs of tracked time</li>
-                  <li>• {screenshots.length} captured screenshots</li>
                   <li>• {idleEvents.length} idle events</li>
                 </ul>
               </div>

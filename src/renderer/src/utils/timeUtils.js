@@ -40,11 +40,22 @@ export const generateDummyScreenshots = (count) => {
   }
   return screenshots;
 };
+// export function formatDecimalHoursToHHMM(decimalHours) {
+//   const totalMinutes = Math.round(decimalHours * 60);
+//   const hours = Math.floor(totalMinutes / 60);
+//   const minutes = totalMinutes % 60;
+//   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+// }
 export function formatDecimalHoursToHHMM(decimalHours) {
   const totalMinutes = Math.round(decimalHours * 60);
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+
+  const parts = [];
+  if (hours > 0) parts.push(`${hours} ${hours === 1 ? 'hr' : 'hrs'}`);
+  if (minutes > 0) parts.push(`${minutes} min`);
+
+  return parts.length > 0 ? parts.join(' ') : '0 min';
 }
 
 

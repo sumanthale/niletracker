@@ -10,25 +10,9 @@ function AppContent() {
   const { currentUser, userProfile, logout } = useAuth()
   const [activeTab, setActiveTab] = useState('dashboard')
 
-  const { sessions, loading } = useTimer() // Initialize timer context
+  const { loading } = useTimer() // Initialize timer context
 
-  // Load user sessions from Firebase
 
-  // const handleSessionSubmit = async (session: TimeSession) => {
-  //   if (!currentUser) return;
-
-  //   try {
-  //     const sessionId = await FirebaseService.saveSession(
-  //       currentUser.uid,
-  //       session
-  //     );
-  //     const sessionWithId = { ...session, id: sessionId };
-  //     setSessions((prev) => [sessionWithId, ...prev]);
-  //   } catch (error) {
-  //     console.error("Error saving session:", error);
-  //     throw error;
-  //   }
-  // };
 
   const handleLogout = async () => {
     try {
@@ -121,7 +105,7 @@ function AppContent() {
 
       {/* Main Content */}
       <div className="max-w-md mx-auto px-6 py-6">
-        {activeTab === 'dashboard' ? <Dashboard /> : <PastSessions sessions={sessions} />}
+        {activeTab === 'dashboard' ? <Dashboard /> : <PastSessions />}
       </div>
 
       {/* Enhanced Bottom Navigation */}

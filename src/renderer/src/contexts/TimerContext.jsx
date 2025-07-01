@@ -64,11 +64,21 @@ export const TimerProvider = ({ children }) => {
 
   useEffect(() => {
     if (!currentUser) return
-    FirebaseService.getUserSessions(currentUser.uid)
+    FirebaseService.getUserSessions(currentUser.uid, 30)
       .then(setSessions)
       .catch((err) => console.error('Failed to load sessions:', err))
       .finally(() => setLoading(false))
   }, [currentUser])
+
+  const reloadSessions = useCallback(() => {
+    if (!currentUser) return
+    setLoading(true)
+    FirebaseService.getUserSessions(currentUser.uid, 30)
+      .then(setSessions)
+      .catch((err) => console.error('Failed to reload sessions:', err))
+      .finally(() => setLoading(false))
+  }, [currentUser])
+
 
   useEffect(() => persistState(), [persistState])
 
@@ -261,7 +271,8 @@ export const TimerProvider = ({ children }) => {
     setShowSubmissionForm,
     sessions,
     loading,
-    setSessions
+    setSessions,
+    reloadSessions
   }
 
   return <TimerContext.Provider value={value}>{children}</TimerContext.Provider>

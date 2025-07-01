@@ -15,13 +15,17 @@ import {
   User,
   FileText,
   TrendingUp,
-  X
+  RefreshCcw
 } from 'lucide-react'
-import { formatDate, formatTime } from '../utils/timeUtils'
+import { formatDate, formatDecimalHoursToHHMM, formatTime } from '../utils/timeUtils'
 import dayjs from 'dayjs'
 import PropTypes from 'prop-types'
+import { useEffect } from 'react'
+import { useTimer } from '../contexts/TimerContext'
 
-const PastSessions = ({ sessions }) => {
+const PastSessions = () => {
+  const { sessions, reloadSessions } = useTimer() // Initialize timer context
+
   const [filters, setFilters] = useState({
     status: 'all',
     dateRange: 'all',
@@ -32,7 +36,6 @@ const PastSessions = ({ sessions }) => {
   const [sortField, setSortField] = useState('date')
   const [sortOrder, setSortOrder] = useState('desc')
   const [showFilters, setShowFilters] = useState(false)
-  const [selectedImage, setSelectedImage] = useState(null)
 
   const filteredAndSortedSessions = useMemo(() => {
     const filtered = sessions.filter((session) => {
@@ -88,6 +91,10 @@ const PastSessions = ({ sessions }) => {
     }
   }
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [])
+
   const getStatusConfig = (status) => {
     const map = {
       approved: {
@@ -135,7 +142,7 @@ const PastSessions = ({ sessions }) => {
             <h1 className="text-2xl font-bold text-gray-900">Work History</h1>
             <p className="text-sm text-gray-500">
               {filteredAndSortedSessions.length} session
-              {filteredAndSortedSessions.length !== 1 ? 's' : ''} found
+              {filteredAndSortedSessions.length !== 1 ? 's' : ''} · past 30 days
             </p>
           </div>
         </div>
@@ -271,12 +278,20 @@ const PastSessions = ({ sessions }) => {
             </div>
           </div>
 
-          {hasActiveFilters && (
+          {hasActiveFilters ? (
             <button
               onClick={clearAllFilters}
               className="text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
             >
               Clear all
+            </button>
+          ) : (
+            <button
+              onClick={reloadSessions}
+              className="text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors flex  gap-1 items-center justify-center"
+            >
+              <RefreshCcw className="h-3.5 w-3.5" />
+              Reload
             </button>
           )}
         </div>
@@ -321,14 +336,15 @@ const PastSessions = ({ sessions }) => {
                     </div>
 
                     {/* Right: Hours and Actions */}
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
                       <div className="text-right">
                         <div
                           className={`text-xl font-bold ${
                             session.productiveHours >= 8 ? 'text-emerald-600' : 'text-amber-600'
                           }`}
                         >
-                          {session.productiveHours.toFixed(1)}h
+                          {/* {session.productiveHours.toFixed(1)}h */}
+                          {formatDecimalHoursToHHMM(session.productiveHours)}
                         </div>
                         <div className="text-xs text-gray-500">productive</div>
                       </div>
@@ -462,28 +478,6 @@ const PastSessions = ({ sessions }) => {
               Clear All Filters
             </button>
           )}
-        </div>
-      )}
-
-      {selectedImage && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50"
-          onClick={() => setSelectedImage(null)}
-        >
-          <div className="relative max-w-4xl max-h-full">
-            <img
-              src={selectedImage}
-              alt="Screenshot preview"
-              className="max-w-full max-h-full object-contain rounded-xl"
-              onClick={(e) => e.stopPropagation()}
-            />
-            <button
-              onClick={() => setSelectedImage(null)}
-              className="absolute top-4 right-4 w-10 h-10 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full flex items-center justify-center transition-all duration-200"
-            >
-              <X className="w-5 h-5 text-gray-700" />
-            </button>
-          </div>
         </div>
       )}
     </div>
